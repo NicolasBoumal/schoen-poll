@@ -53,7 +53,7 @@
         // 1. All necessary Firebase imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // 2. PASTE YOUR FIREBASE CONFIG HERE
         const firebaseConfig = {
@@ -109,10 +109,23 @@
 
         // 6. Database Listeners
         function setupAdminListeners() {
-            // Listen to student presence
-            unsubscribePresence = onSnapshot(collection(db, "presence"), (snapshot) => {
+            // Calculate the timestamp for 3 hours ago
+            const threeHoursAgo = new Date();
+            threeHoursAgo.setHours(threeHoursAgo.getHours() - 3);
+            const cutoff = Timestamp.fromDate(threeHoursAgo);
+
+            // Create a query to filter the collection
+            const presenceQuery = query(
+                collection(db, "presence"), 
+                where("last_seen", ">=", cutoff)
+            );
+
+            // Listen to the filtered query instead of the whole collection
+            unsubscribePresence = onSnapshot(presenceQuery, (snapshot) => {
                 document.getElementById('studentCount').innerText = snapshot.size;
             });
+
+            // ... (keep your existing Live State listener right below this) ...
 
             // Listen to live state (Traffic Controller)
             unsubscribeLiveState = onSnapshot(doc(db, "state", "live"), (docSnap) => {
