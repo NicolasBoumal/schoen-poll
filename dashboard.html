@@ -122,15 +122,25 @@
                     
                     if (data.status === "open") {
                         questionStatus.innerText = "Live Poll Open";
-                        questionStatus.style.color = "#34A853"; // Green
+                        questionStatus.style.color = "#34A853";
                     } else {
                         questionStatus.innerText = "Poll Closed";
-                        questionStatus.style.color = "#EA4335"; // Red
+                        questionStatus.style.color = "#EA4335";
                     }
 
-                    // If a new question is launched, reset the chart and answer listener
-                    initChart(data.options);
-                    listenToAnswers(data.active_question_id, data.options);
+                    // NEW: Handle the Reveal State
+                    const chartCanvas = document.getElementById('resultsChart');
+                    if (data.reveal) {
+                        chartCanvas.style.visibility = "visible";
+                    } else {
+                        chartCanvas.style.visibility = "hidden";
+                    }
+
+                    // If it's a new question, initialize
+                    if (!chartInstance || chartInstance.data.labels.join() !== data.options.join()) {
+                        initChart(data.options);
+                        listenToAnswers(data.active_question_id, data.options);
+                    }
                 }
             });
         }

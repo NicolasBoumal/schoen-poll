@@ -8,10 +8,9 @@
         .panel { border: 1px solid #ccc; padding: 20px; border-radius: 8px; margin-top: 20px; }
         .hidden { display: none; }
         input { width: 100%; padding: 8px; margin: 10px 0; box-sizing: border-box; }
-        button { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; }
-        #loginBtn { background: #4285F4; color: white; }
-        #launchBtn { background: #34A853; color: white; }
-        #closeBtn { background: #EA4335; color: white; margin-top: 20px;}
+        button { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; color: white;}
+        #loginBtn { background: #4285F4; }
+        #launchBtn { background: #4285F4; width: 100%; margin-bottom: 20px;}
     </style>
 </head>
 <body>
@@ -23,27 +22,38 @@
         <button id="loginBtn">Log in with Google</button>
     </div>
 
-    <div id="adminSection" class="panel hidden">    
+    <div id="adminSection" class="panel hidden">
+        
         <div style="display: flex; justify-content: space-between; align-items: center; background: #f0f4ff; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #d2e3fc;">
             <span id="userEmailDisplay" style="font-weight: bold; color: #4285F4; font-size: 0.9em;"></span>
             <button id="logoutBtn" style="background: #EA4335; padding: 6px 12px; font-size: 0.8em;">Log Out</button>
         </div>
 
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; text-align: center; font-weight: bold; border: 1px solid #e9ecef;">
+            👥 Connected Students: <span id="studentCount" style="color: #4285F4;">0</span> &nbsp;|&nbsp;
+            🗳️ Votes Cast: <span id="voteCount" style="color: #34A853;">0</span>
+        </div>
+
         <h3>Launch a Question</h3>
         <label for="optionsInput">Comma-separated options:</label>
-        <input type="text" id="optionsInput" value="Gradient Descent, Trust-Region, Nelder-Mead">
+        <input type="text" id="optionsInput" value="Yes, No">
         
-        <button id="launchBtn">Launch Question</button>
+        <button id="launchBtn">Launch New Question</button>
+        
         <hr style="margin: 20px 0;">
-        <button id="closeBtn" style="background: #666;">Close Current Poll</button>
-        <p id="statusText" style="color: #666; font-size: 0.9em;"></p>
+        
+        <div style="display: flex; gap: 10px;">
+            <button id="toggleStatusBtn" style="flex: 1; background: #666;">Close Poll</button>
+            <button id="revealBtn" style="flex: 1; background: #FBBC05; color: black;">Reveal Answers</button>
+        </div>
+        <p id="statusText" style="color: #666; font-size: 0.9em; margin-top: 15px;"></p>
     </div>
 
     <script type="module">
-        // 1. Import Firebase modules
+        // 1. All necessary Firebase imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // 2. PASTE YOUR FIREBASE CONFIG HERE
         const firebaseConfig = {
@@ -55,82 +65,143 @@
             appId: "1:367126138943:web:857243dd5c68a2f00ce88a"
         };
 
-        // 3. Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // 4. UI Elements
+        // 3. UI Elements
         const loginSection = document.getElementById('loginSection');
         const adminSection = document.getElementById('adminSection');
+        const userEmailDisplay = document.getElementById('userEmailDisplay');
         const statusText = document.getElementById('statusText');
-        const userEmailDisplay = document.getElementById('userEmailDisplay'); // NEW
+
+        // 4. State Variables
+        let currentLiveState = {};
+        let unsubscribeAnswers = null;
+        let unsubscribePresence = null;
+        let unsubscribeLiveState = null;
 
         // 5. Authentication Logic
         document.getElementById('loginBtn').addEventListener('click', () => {
             signInWithPopup(auth, new GoogleAuthProvider()).catch(error => alert(error.message));
         });
 
-        // 5bis. Logout Logic
         document.getElementById('logoutBtn').addEventListener('click', () => {
-            signOut(auth).then(() => {
-                statusText.innerText = ""; // Clear any leftover status messages
-            }).catch((error) => {
-                console.error("Logout error:", error);
-            });
+            signOut(auth).catch((error) => console.error("Logout error:", error));
         });
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // User is signed in
-                userEmailDisplay.innerText = `Admin: ${user.email}`; // NEW: Show email
+                userEmailDisplay.innerText = `Admin: ${user.email}`;
                 loginSection.classList.add('hidden');
                 adminSection.classList.remove('hidden');
+                
+                // ONLY start listening to the database after successful login
+                setupAdminListeners(); 
             } else {
-                // User is signed out
                 loginSection.classList.remove('hidden');
                 adminSection.classList.add('hidden');
+                
+                // Stop listening to save reads if logged out
+                cleanupListeners(); 
             }
         });
 
-        // 6. Launch Question Logic
+        // 6. Database Listeners
+        function setupAdminListeners() {
+            // Listen to student presence
+            unsubscribePresence = onSnapshot(collection(db, "presence"), (snapshot) => {
+                document.getElementById('studentCount').innerText = snapshot.size;
+            });
+
+            // Listen to live state (Traffic Controller)
+            unsubscribeLiveState = onSnapshot(doc(db, "state", "live"), (docSnap) => {
+                if (docSnap.exists()) {
+                    currentLiveState = docSnap.data();
+                    
+                    // Sync Open/Close Button
+                    const toggleBtn = document.getElementById('toggleStatusBtn');
+                    if (currentLiveState.status === "open") {
+                        toggleBtn.innerText = "Close Poll";
+                        toggleBtn.style.background = "#EA4335"; // Red
+                    } else {
+                        toggleBtn.innerText = "Re-open Poll";
+                        toggleBtn.style.background = "#34A853"; // Green
+                    }
+
+                    // Sync Reveal Button
+                    const revealBtn = document.getElementById('revealBtn');
+                    if (currentLiveState.reveal) {
+                        revealBtn.innerText = "Hide Answers";
+                        revealBtn.style.opacity = "0.5";
+                    } else {
+                        revealBtn.innerText = "Reveal Answers";
+                        revealBtn.style.opacity = "1";
+                    }
+
+                    // Keep vote count updated for the active question
+                    if (currentLiveState.active_question_id) {
+                        listenToAdminVotes(currentLiveState.active_question_id);
+                    }
+                }
+            });
+        }
+
+        function cleanupListeners() {
+            if (unsubscribePresence) unsubscribePresence();
+            if (unsubscribeLiveState) unsubscribeLiveState();
+            if (unsubscribeAnswers) unsubscribeAnswers();
+        }
+
+        // Count votes for the admin UI
+        function listenToAdminVotes(questionId) {
+            if (unsubscribeAnswers) unsubscribeAnswers();
+            unsubscribeAnswers = onSnapshot(collection(db, "questions", questionId, "answers"), (snapshot) => {
+                document.getElementById('voteCount').innerText = snapshot.size;
+            });
+        }
+
+        // 7. Button Actions
+        // Launch Question
         document.getElementById('launchBtn').addEventListener('click', async () => {
             const optionsRaw = document.getElementById('optionsInput').value;
-            const optionsArray = optionsRaw.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
+            const optionsArray = optionsRaw.split(',').map(o => o.trim()).filter(o => o.length > 0);
 
             if (optionsArray.length === 0) return alert("Please provide at least one option.");
 
             try {
-                // A. Create the historical question document
                 const questionRef = await addDoc(collection(db, "questions"), {
                     timestamp: serverTimestamp(),
                     options: optionsArray
                 });
 
-                // B. Update the Live State for the audience
                 await setDoc(doc(db, "state", "live"), {
                     active_question_id: questionRef.id,
                     status: "open",
+                    reveal: false, // Hidden by default
                     options: optionsArray
                 });
 
-                statusText.innerText = `Successfully launched question ID: ${questionRef.id}`;
+                statusText.innerText = "Question launched successfully!";
+                setTimeout(() => statusText.innerText = "", 3000); // Clear message after 3s
             } catch (error) {
                 console.error("Error launching:", error);
                 alert("Failed to launch. Check console and security rules.");
             }
         });
 
-        // 7. Close Question Logic
-        document.getElementById('closeBtn').addEventListener('click', async () => {
-            try {
-                // Only update the status field to 'closed', leave the rest intact
-                await setDoc(doc(db, "state", "live"), { status: "closed" }, { merge: true });
-                statusText.innerText = "Poll closed. Devices will stop accepting input.";
-            } catch (error) {
-                console.error("Error closing:", error);
-                alert("Failed to close poll.");
-            }
+        // Toggle Open/Closed Status
+        document.getElementById('toggleStatusBtn').addEventListener('click', async () => {
+            if (!currentLiveState.active_question_id) return; // Prevent clicking before launch
+            const newStatus = currentLiveState.status === "open" ? "closed" : "open";
+            await setDoc(doc(db, "state", "live"), { status: newStatus }, { merge: true });
+        });
+
+        // Toggle Reveal Status
+        document.getElementById('revealBtn').addEventListener('click', async () => {
+            if (!currentLiveState.active_question_id) return;
+            const newReveal = !currentLiveState.reveal;
+            await setDoc(doc(db, "state", "live"), { reveal: newReveal }, { merge: true });
         });
     </script>
 </body>
