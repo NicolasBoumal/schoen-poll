@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Lecture Poll</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; }
+        #statusMessage { color: #666; margin-bottom: 20px; font-style: italic; }
+        .options-container { display: flex; flex-direction: column; gap: 15px; }
+        button.option-btn {
+            padding: 15px 20px; font-size: 1.2em; cursor: pointer;
+            border: 2px solid #4285F4; border-radius: 8px;
+            background: white; color: #4285F4; transition: all 0.2s;
+        }
+        button.option-btn:hover { background: #f0f4ff; }
+        button.option-btn.selected { background: #4285F4; color: white; }
+        button.option-btn:disabled { border-color: #ccc; color: #999; cursor: not-allowed; background: #f9f9f9; }
+        button.option-btn.selected:disabled { background: #a0c1ff; border-color: #a0c1ff; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>Live Poll</h2>
+    <div id="statusMessage">Connecting to the lecture...</div>
+    <div id="optionsContainer" class="options-container"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // PASTE YOUR FIREBASE CONFIG HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRpILPQ5n3PimcVlQTl2g1oJ5zwR2Xing",
+            authDomain: "my-live-polling.firebaseapp.com",
+            projectId: "my-live-polling",
+            storageBucket: "my-live-polling.firebasestorage.app",
+            messagingSenderId: "367126138943",
+            appId: "1:367126138943:web:857243dd5c68a2f00ce88a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const statusMessage = document.getElementById('statusMessage');
+        const optionsContainer = document.getElementById('optionsContainer');
+        
+        let currentUser = null;
+        let activeQuestionId = null;
+        let currentSelection = null;
+
+        // 1. Log the student in silently
+        signInAnonymously(auth).catch((error) => {
+            statusMessage.innerText = "Failed to connect. Please refresh.";
+            console.error(error);
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                startListeningToLiveState();
+            }
+        });
+
+        // 2. Listen to the live state
+        function startListeningToLiveState() {
+            const liveStateRef = doc(db, "state", "live");
+            
+            onSnapshot(liveStateRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    handleStateChange(data);
+                }
+            });
+        }
+
+        // 3. Update UI based on what the Admin is doing
+        function handleStateChange(data) {
+            let isNewQuestionLoad = false;
+            
+            // Check if this is a new question, or if we just refreshed the page
+            if (data.active_question_id !== activeQuestionId) {
+                activeQuestionId = data.active_question_id;
+                currentSelection = null;
+                isNewQuestionLoad = true; 
+            }
+
+            optionsContainer.innerHTML = ''; // Clear old buttons
+
+            // Set the main text
+            if (data.status === "open") {
+                statusMessage.innerText = "Select an answer:";
+            } else {
+                statusMessage.innerText = "Polling is currently closed.";
+            }
+
+            // Generate the buttons
+            data.options.forEach(optionText => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = optionText;
+                
+                if (data.status === "closed") {
+                    btn.disabled = true;
+                } else {
+                    btn.onclick = () => submitAnswer(optionText, btn);
+                }
+
+                if (currentSelection === optionText) btn.classList.add('selected');
+                
+                optionsContainer.appendChild(btn);
+            });
+
+            // If we just loaded the question, ask the database if we already voted
+            if (isNewQuestionLoad) {
+                restorePreviousAnswer(activeQuestionId);
+            }
+        }
+
+        // 4. Send the vote to the database
+        async function submitAnswer(selectedOption, clickedButton) {
+            if (!currentUser || !activeQuestionId) return;
+
+            // Optimistically update the UI so it feels instant
+            currentSelection = selectedOption;
+            document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            clickedButton.classList.add('selected');
+
+            try {
+                // Write to: questions/{questionId}/answers/{userId}
+                const answerRef = doc(db, "questions", activeQuestionId, "answers", currentUser.uid);
+                await setDoc(answerRef, {
+                    choice: selectedOption,
+                    timestamp: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error saving answer:", error);
+                statusMessage.innerText = "Error saving answer. Trying again...";
+            }
+        }
+
+        // 5. Check if the user already answered this question (for page reloads)
+        async function restorePreviousAnswer(questionId) {
+            if (!currentUser || !questionId) return;
+
+            try {
+                const answerRef = doc(db, "questions", questionId, "answers", currentUser.uid);
+                const docSnap = await getDoc(answerRef);
+
+                // If they have an answer on record, and the question hasn't changed while loading:
+                if (docSnap.exists() && activeQuestionId === questionId) {
+                    currentSelection = docSnap.data().choice;
+
+                    // Find the matching button and add the 'selected' class
+                    document.querySelectorAll('.option-btn').forEach(btn => {
+                        if (btn.innerText === currentSelection) {
+                            btn.classList.add('selected');
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching previous answer:", error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lecture Poll - Admin</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        .panel { border: 1px solid #ccc; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .hidden { display: none; }
+        input { width: 100%; padding: 8px; margin: 10px 0; box-sizing: border-box; }
+        button { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; }
+        #loginBtn { background: #4285F4; color: white; }
+        #launchBtn { background: #34A853; color: white; }
+        #closeBtn { background: #EA4335; color: white; margin-top: 20px;}
+    </style>
+</head>
+<body>
+
+    <h2>Admin Control Panel</h2>
+    
+    <div id="loginSection">
+        <p>Please log in with your authorized Google account.</p>
+        <button id="loginBtn">Log in with Google</button>
+    </div>
+
+    <div id="adminSection" class="panel hidden">    
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f0f4ff; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #d2e3fc;">
+            <span id="userEmailDisplay" style="font-weight: bold; color: #4285F4; font-size: 0.9em;"></span>
+            <button id="logoutBtn" style="background: #EA4335; padding: 6px 12px; font-size: 0.8em;">Log Out</button>
+        </div>
+
+        <h3>Launch a Question</h3>
+        <label for="optionsInput">Comma-separated options:</label>
+        <input type="text" id="optionsInput" value="Gradient Descent, Trust-Region, Nelder-Mead">
+        
+        <button id="launchBtn">Launch Question</button>
+        <hr style="margin: 20px 0;">
+        <button id="closeBtn" style="background: #666;">Close Current Poll</button>
+        <p id="statusText" style="color: #666; font-size: 0.9em;"></p>
+    </div>
+
+    <script type="module">
+        // 1. Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // 2. PASTE YOUR FIREBASE CONFIG HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRpILPQ5n3PimcVlQTl2g1oJ5zwR2Xing",
+            authDomain: "my-live-polling.firebaseapp.com",
+            projectId: "my-live-polling",
+            storageBucket: "my-live-polling.firebasestorage.app",
+            messagingSenderId: "367126138943",
+            appId: "1:367126138943:web:857243dd5c68a2f00ce88a"
+        };
+
+        // 3. Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 4. UI Elements
+        const loginSection = document.getElementById('loginSection');
+        const adminSection = document.getElementById('adminSection');
+        const statusText = document.getElementById('statusText');
+        const userEmailDisplay = document.getElementById('userEmailDisplay'); // NEW
+
+        // 5. Authentication Logic
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            signInWithPopup(auth, new GoogleAuthProvider()).catch(error => alert(error.message));
+        });
+
+        // 5bis. Logout Logic
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            signOut(auth).then(() => {
+                statusText.innerText = ""; // Clear any leftover status messages
+            }).catch((error) => {
+                console.error("Logout error:", error);
+            });
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                userEmailDisplay.innerText = `Admin: ${user.email}`; // NEW: Show email
+                loginSection.classList.add('hidden');
+                adminSection.classList.remove('hidden');
+            } else {
+                // User is signed out
+                loginSection.classList.remove('hidden');
+                adminSection.classList.add('hidden');
+            }
+        });
+
+        // 6. Launch Question Logic
+        document.getElementById('launchBtn').addEventListener('click', async () => {
+            const optionsRaw = document.getElementById('optionsInput').value;
+            const optionsArray = optionsRaw.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
+
+            if (optionsArray.length === 0) return alert("Please provide at least one option.");
+
+            try {
+                // A. Create the historical question document
+                const questionRef = await addDoc(collection(db, "questions"), {
+                    timestamp: serverTimestamp(),
+                    options: optionsArray
+                });
+
+                // B. Update the Live State for the audience
+                await setDoc(doc(db, "state", "live"), {
+                    active_question_id: questionRef.id,
+                    status: "open",
+                    options: optionsArray
+                });
+
+                statusText.innerText = `Successfully launched question ID: ${questionRef.id}`;
+            } catch (error) {
+                console.error("Error launching:", error);
+                alert("Failed to launch. Check console and security rules.");
+            }
+        });
+
+        // 7. Close Question Logic
+        document.getElementById('closeBtn').addEventListener('click', async () => {
+            try {
+                // Only update the status field to 'closed', leave the rest intact
+                await setDoc(doc(db, "state", "live"), { status: "closed" }, { merge: true });
+                statusText.innerText = "Poll closed. Devices will stop accepting input.";
+            } catch (error) {
+                console.error("Error closing:", error);
+                alert("Failed to close poll.");
+            }
+        });
+    </script>
+</body>
+</html>

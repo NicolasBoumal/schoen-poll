@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Lecture Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; text-align: center; }
+        #loginSection { border: 1px solid #ccc; padding: 40px; border-radius: 8px; margin-top: 50px; }
+        .hidden { display: none; }
+        button { background: #4285F4; color: white; padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; font-size: 1.1em; }
+        #chartContainer { position: relative; height: 50vh; width: 100%; margin-top: 30px; }
+        #questionStatus { font-size: 1.5em; font-weight: bold; margin-bottom: 10px; color: #333; }
+        #voteCount { color: #666; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="loginSection">
+        <h2>Dashboard Login</h2>
+        <p>Please authenticate to access live audience data.</p>
+        <button id="loginBtn">Log in with Google</button>
+    </div>
+
+    <div id="dashboardSection" class="hidden">
+        <div id="questionStatus">Waiting for a question to be launched...</div>
+        <div id="voteCount">Total Votes: 0</div>
+        
+        <div id="chartContainer">
+            <canvas id="resultsChart"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // PASTE YOUR FIREBASE CONFIG HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRpILPQ5n3PimcVlQTl2g1oJ5zwR2Xing",
+            authDomain: "my-live-polling.firebaseapp.com",
+            projectId: "my-live-polling",
+            storageBucket: "my-live-polling.firebasestorage.app",
+            messagingSenderId: "367126138943",
+            appId: "1:367126138943:web:857243dd5c68a2f00ce88a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const loginSection = document.getElementById('loginSection');
+        const dashboardSection = document.getElementById('dashboardSection');
+        const questionStatus = document.getElementById('questionStatus');
+        const voteCount = document.getElementById('voteCount');
+        
+        let chartInstance = null;
+        let unsubscribeAnswers = null; // Keeps track of the active answer listener
+
+        // 1. Authentication
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            signInWithPopup(auth, new GoogleAuthProvider()).catch(error => alert(error.message));
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginSection.classList.add('hidden');
+                dashboardSection.classList.remove('hidden');
+                startListeningToLiveState();
+            } else {
+                loginSection.classList.remove('hidden');
+                dashboardSection.classList.add('hidden');
+            }
+        });
+
+        // 2. Setup or Update the Chart
+        function initChart(options) {
+            const ctx = document.getElementById('resultsChart').getContext('2d');
+            
+            // Destroy the old chart if it exists so we can draw a new one
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // Create an array of zeros matching the number of options
+            const initialData = new Array(options.length).fill(0);
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: options,
+                    datasets: [{
+                        label: 'Votes',
+                        data: initialData,
+                        backgroundColor: '#4285F4',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 } // Only show whole numbers
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // 3. Listen to the Live State (Traffic Controller)
+        function startListeningToLiveState() {
+            onSnapshot(doc(db, "state", "live"), (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    if (data.status === "open") {
+                        questionStatus.innerText = "Live Poll Open";
+                        questionStatus.style.color = "#34A853"; // Green
+                    } else {
+                        questionStatus.innerText = "Poll Closed";
+                        questionStatus.style.color = "#EA4335"; // Red
+                    }
+
+                    // If a new question is launched, reset the chart and answer listener
+                    initChart(data.options);
+                    listenToAnswers(data.active_question_id, data.options);
+                }
+            });
+        }
+
+        // 4. Listen to the specific question's answers
+        function listenToAnswers(questionId, options) {
+            // Unsubscribe from the previous question's answers if necessary
+            if (unsubscribeAnswers) {
+                unsubscribeAnswers();
+            }
+
+            const answersRef = collection(db, "questions", questionId, "answers");
+            
+            // Set up a new real-time listener
+            unsubscribeAnswers = onSnapshot(answersRef, (snapshot) => {
+                let totalVotes = 0;
+                // Create a dictionary to keep running tallies (e.g., {"Convex": 0, "Non-convex": 0})
+                const tallies = {};
+                options.forEach(opt => tallies[opt] = 0);
+
+                // Loop through all documents in the subcollection
+                snapshot.forEach((doc) => {
+                    const answerData = doc.data();
+                    if (tallies[answerData.choice] !== undefined) {
+                        tallies[answerData.choice]++;
+                        totalVotes++;
+                    }
+                });
+
+                // Update the UI
+                voteCount.innerText = `Total Votes: ${totalVotes}`;
+                
+                // Map the tallies back to the chart data array in the correct order
+                const newData = options.map(opt => tallies[opt]);
+                chartInstance.data.datasets[0].data = newData;
+                chartInstance.update(); // Tell Chart.js to animate the new bars
+            });
+        }
+    </script>
+</body>
+</html>
