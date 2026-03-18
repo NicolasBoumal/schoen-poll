@@ -120,13 +120,7 @@
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // PASTE YOUR FIREBASE CONFIG HERE
-        const firebaseConfig = {
-            apiKey: "AIzaSyCRpILPQ5n3PimcVlQTl2g1oJ5zwR2Xing",
-            authDomain: "my-live-polling.firebaseapp.com",
-            projectId: "my-live-polling"
-            // ... add the rest if needed
-        };
+        import { firebaseConfig } from "./config.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);

@@ -2,15 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 1. Firebase Config (Paste your actual config here)
-const firebaseConfig = {
-    apiKey: "AIzaSyCRpILPQ5n3PimcVlQTl2g1oJ5zwR2Xing",
-    authDomain: "my-live-polling.firebaseapp.com",
-    projectId: "my-live-polling",
-    storageBucket: "my-live-polling.firebasestorage.app",
-    messagingSenderId: "367126138943",
-    appId: "1:367126138943:web:857243dd5c68a2f00ce88a"
-};
+import { firebaseConfig } from "./config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
