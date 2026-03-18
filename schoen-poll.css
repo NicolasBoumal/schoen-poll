@@ -20,7 +20,7 @@
 
 /* Style the labels (possible answers)  */
 #resultsChart .label {
-    font-size: xx-large;
+    font-size: 3.5rem;
     font-weight: 700;
     fill: #2c3e50; /* text color */
     
