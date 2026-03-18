@@ -26,7 +26,10 @@
         
         <div style="display: flex; justify-content: space-between; align-items: center; background: #f0f4ff; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #d2e3fc;">
             <span id="userEmailDisplay" style="font-weight: bold; color: #4285F4; font-size: 0.9em;"></span>
-            <button id="logoutBtn" style="background: #EA4335; padding: 6px 12px; font-size: 0.8em;">Log Out</button>
+            <div>
+                <button id="resetPresenceBtn" style="background: #FBBC05; color: black; padding: 6px 12px; font-size: 0.8em; margin-right: 5px;">Reset Presence</button>
+                <button id="logoutBtn" style="background: #EA4335; padding: 6px 12px; font-size: 0.8em;">Log Out</button>
+            </div>
         </div>
 
         <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; text-align: center; font-weight: bold; border: 1px solid #e9ecef;">
@@ -55,7 +58,7 @@
         // 1. All necessary Firebase imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, query, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // 2. PASTE YOUR FIREBASE CONFIG HERE
         const firebaseConfig = {
@@ -82,6 +85,13 @@
         let unsubscribeAnswers = null;
         let unsubscribePresence = null;
         let unsubscribeLiveState = null;
+        
+        // The global Set for tracking distinct users
+        let seenUserIds = new Set();
+
+        function updateStudentCountUI() {
+            document.getElementById('studentCount').innerText = seenUserIds.size;
+        }
 
         // 5. Authentication Logic
         document.getElementById('loginBtn').addEventListener('click', () => {
@@ -98,36 +108,24 @@
                 loginSection.classList.add('hidden');
                 adminSection.classList.remove('hidden');
                 
-                // ONLY start listening to the database after successful login
                 setupAdminListeners(); 
             } else {
                 loginSection.classList.remove('hidden');
                 adminSection.classList.add('hidden');
                 
-                // Stop listening to save reads if logged out
                 cleanupListeners(); 
             }
         });
 
         // 6. Database Listeners
         function setupAdminListeners() {
-            // Calculate the timestamp for 3 hours ago
-            const threeHoursAgo = new Date();
-            threeHoursAgo.setHours(threeHoursAgo.getHours() - 3);
-            const cutoff = Timestamp.fromDate(threeHoursAgo);
-
-            // Create a query to filter the collection
-            const presenceQuery = query(
-                collection(db, "presence"), 
-                where("last_seen", ">=", cutoff)
-            );
-
-            // Listen to the filtered query instead of the whole collection
-            unsubscribePresence = onSnapshot(presenceQuery, (snapshot) => {
-                document.getElementById('studentCount').innerText = snapshot.size;
+            // Simple listener for presence. Adds any document ID to our Set.
+            unsubscribePresence = onSnapshot(collection(db, "presence"), (snapshot) => {
+                snapshot.forEach(doc => {
+                    seenUserIds.add(doc.id);
+                });
+                updateStudentCountUI();
             });
-
-            // ... (keep your existing Live State listener right below this) ...
 
             // Listen to live state (Traffic Controller)
             unsubscribeLiveState = onSnapshot(doc(db, "state", "live"), (docSnap) => {
@@ -173,10 +171,50 @@
             if (unsubscribeAnswers) unsubscribeAnswers();
             unsubscribeAnswers = onSnapshot(collection(db, "questions", questionId, "answers"), (snapshot) => {
                 document.getElementById('voteCount').innerText = snapshot.size;
+                
+                // Every person who answers is also added to the set of (distinct) active users
+                snapshot.forEach(doc => {
+                    seenUserIds.add(doc.id);
+                });
+                updateStudentCountUI();
             });
         }
 
         // 7. Button Actions
+
+        // Reset Presence Button
+        document.getElementById('resetPresenceBtn').addEventListener('click', async () => {
+            // if (!confirm("Are you sure you want to reset the active user count? This will wipe the presence records.")) return;
+            
+            statusText.innerText = "Resetting presence...";
+
+            try {
+                // 1. Fetch and delete all documents in the presence collection
+                const presenceSnap = await getDocs(collection(db, "presence"));
+                const deletePromises = [];
+                presenceSnap.forEach(d => {
+                    deletePromises.push(deleteDoc(d.ref));
+                });
+                await Promise.all(deletePromises);
+                
+                // 2. Clear the local distinct list
+                seenUserIds.clear();
+                
+                // 3. Intelligently preserve anyone who currently has a vote cast for the active question
+                if (currentLiveState.active_question_id) {
+                    const ansSnap = await getDocs(collection(db, "questions", currentLiveState.active_question_id, "answers"));
+                    ansSnap.forEach(d => seenUserIds.add(d.id));
+                }
+                
+                updateStudentCountUI();
+                statusText.innerText = "Presence reset successfully.";
+                setTimeout(() => statusText.innerText = "", 3000);
+            } catch (error) {
+                console.error("Error resetting presence:", error);
+                statusText.innerText = "Error resetting presence.";
+            }
+        });
+
         // Launch Question
         document.getElementById('launchBtn').addEventListener('click', async () => {
             const optionsRaw = document.getElementById('optionsInput').value;
@@ -185,22 +223,21 @@
             if (optionsArray.length === 0) return alert("Please provide at least one option.");
 
             try {
-                // 1. Create the historical question document
                 const questionRef = await addDoc(collection(db, "questions"), {
                     timestamp: serverTimestamp(),
                     options: optionsArray
                 });
 
-                // 2. Update the Live State (Traffic Controller)
-                // This explicitly resets 'reveal' to false and 'status' to 'open'
+                // Include user_count in the payload
                 await setDoc(doc(db, "state", "live"), {
                     active_question_id: questionRef.id,
                     status: "open",
-                    reveal: false,
-                    options: optionsArray
+                    reveal: false, // If "false" then, by default, when a new question is launched, results are hidden.
+                    options: optionsArray,
+                    user_count: seenUserIds.size
                 });
 
-                statusText.innerText = "New question launched. Dashboard is hidden.";
+                statusText.innerText = "New question launched.";
                 setTimeout(() => statusText.innerText = "", 3000);
             } catch (error) {
                 console.error("Error launching:", error);
@@ -212,14 +249,24 @@
         document.getElementById('toggleStatusBtn').addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return; // Prevent clicking before launch
             const newStatus = currentLiveState.status === "open" ? "closed" : "open";
-            await setDoc(doc(db, "state", "live"), { status: newStatus }, { merge: true });
+            
+            // Include user_count in the payload
+            await setDoc(doc(db, "state", "live"), { 
+                status: newStatus,
+                user_count: seenUserIds.size
+            }, { merge: true });
         });
 
         // Toggle Reveal Status
         document.getElementById('revealBtn').addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return;
             const newReveal = !currentLiveState.reveal;
-            await setDoc(doc(db, "state", "live"), { reveal: newReveal }, { merge: true });
+            
+            // Include user_count in the payload
+            await setDoc(doc(db, "state", "live"), { 
+                reveal: newReveal,
+                user_count: seenUserIds.size
+            }, { merge: true });
         });
 
         // Simulation button
@@ -236,7 +283,6 @@
 
             statusText.innerText = "Simulating organic traffic...";
 
-            // Recursive function to create random timing
             function sendNextVote() {
                 if (votesSent >= totalToSimulate) {
                     statusText.innerText = "Simulation complete.";
@@ -253,16 +299,13 @@
                     isSimulated: true
                 }).then(() => {
                     votesSent++;
-                    
-                    // Pick a random delay between 20ms and 250ms for the next vote
-                    const nextDelay = Math.floor(Math.random() * 230) + 20;
+                    const nextDelay = Math.floor(Math.random() * 100) + 10;
                     setTimeout(sendNextVote, nextDelay);
                 }).catch(e => {
                     console.error("Sim error:", e);
                 });
             }
 
-            // Start the chain
             sendNextVote();
         });
 
