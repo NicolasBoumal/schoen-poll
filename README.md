@@ -21,6 +21,7 @@ Then:
 
 5. Copy the files from this repo and serve them from wherever (e.g., using Github Pages).
 6. In each `admin.html`, `index.html` and `schoen-poll.js`, look for `firebaseConfig`: copy your data there (provided by Firebase, under Settings -> General).
+7. In `schoen-poll.js`, also update `clickerUrl` with the URL to your clicker (the `index.html` page).
 
 Usage should be self explanatory. In a nutshell:
 

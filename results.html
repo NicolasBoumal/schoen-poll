@@ -19,11 +19,18 @@
 </head>
 <body>
 
-    <!-- Then also include these three anywhere on your webpage.
+    <!-- Then also include these lines anywhere on your webpage.
          It's hidden by default: the Admin remote toggles reveal/hide. -->
     <button id="pollLoginBtn">Admin Login</button>
     <div id="live-poll-overlay">
         <svg id="resultsChart"></svg>
+    </div>
+    <div id="qr-container" class="hidden">
+        <div class="qr-card">
+            <img id="qr-image" src="" alt="Scan to join">
+            <p>Scan to join the poll! Or go to:</p>
+            <code id="qr-url"></code>
+        </div>
     </div>
 
 </body>

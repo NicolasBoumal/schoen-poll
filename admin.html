@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
+
     <title>Schoen Poll - Remote</title>
 
     <!-- These are just for the favicon. -->
@@ -81,7 +81,7 @@
     <div id="adminSection" class="hidden">
         
         <div class="readout">
-            Votes: <span id="voteCount">0</span> / <span id="studentCount">0</span>
+            Votes: <span id="voteCount">0</span> / <span id="userCount">0</span>
         </div>
 
         <div class="controls-grid">
@@ -106,6 +106,7 @@
             <summary>Advanced Admin Tools</summary>
             <div class="admin-tools">
                 <span id="userEmailDisplay" style="font-size: 0.8rem; text-align: center; color: #666;"></span>
+                <button class="tool-btn" id="qrToggleBtn" style="background: #673ab7; color: white;">Show QR Code</button>
                 <button class="tool-btn" id="simulateBtn">Simulate 100 Votes</button>
                 <button class="tool-btn danger-btn" id="resetPresenceBtn">Reset Presence Count</button>
                 <button class="tool-btn" id="logoutBtn" style="background: #555; color: white;">Log Out</button>
@@ -137,6 +138,7 @@
         const statusText = document.getElementById('statusText');
         const revealBtn = document.getElementById('revealBtn');
         const toggleBtn = document.getElementById('toggleStatusBtn');
+        const qrToggleBtn = document.getElementById('qrToggleBtn');
 
         // State Variables
         let currentLiveState = {};
@@ -147,7 +149,7 @@
         let currentVoteCount = 0;
 
         function updateCountsUI() {
-            document.getElementById('studentCount').innerText = seenUserIds.size;
+            document.getElementById('userCount').innerText = seenUserIds.size;
             document.getElementById('voteCount').innerText = currentVoteCount;
         }
 
@@ -193,6 +195,12 @@
                     } else {
                         revealBtn.innerText = "Reveal Answers";
                         revealBtn.style.opacity = "1";
+                    }
+
+                    if (currentLiveState.showQR) {
+                        qrToggleBtn.innerText = "Hide QR Code";
+                    } else {
+                        qrToggleBtn.innerText = "Show QR Code";
                     }
 
                     if (currentLiveState.active_question_id) {
@@ -275,6 +283,14 @@
             await setDoc(doc(db, "state", "live"), { 
                 status: newStatus,
                 user_count: seenUserIds.size 
+            }, { merge: true });
+        });
+
+        // QR Toggle
+        qrToggleBtn.addEventListener('click', async () => {
+            const newState = !currentLiveState.showQR;
+            await setDoc(doc(db, "state", "live"), { 
+                showQR: newState 
             }, { merge: true });
         });
 

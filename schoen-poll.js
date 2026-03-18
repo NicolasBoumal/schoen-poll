@@ -28,10 +28,16 @@ let currentQuestionId = null;
 // Custom color palette
 const colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD", "#CCB974"];
 
+// Specify the URL to the clicker here, for the QR code
+const clickerUrl = "https://nicolasboumal.github.io/schoen-poll/";
+
 // 3. Wait for the DOM to load before grabbing elements
 document.addEventListener("DOMContentLoaded", () => {
     const loginBtn = document.getElementById('pollLoginBtn');
     const overlay = document.getElementById('live-poll-overlay');
+    const qrContainer = document.getElementById('qr-container');
+    const qrImage = document.getElementById('qr-image');
+    const qrUrl = document.getElementById('qr-url');
 
     // Authentication Logic
     if (loginBtn) {
@@ -67,6 +73,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     currentQuestionId = data.active_question_id; // Store the new ID
                     initSwarm(data.options);
                     listenToAnswers(data.active_question_id);
+                }
+
+                // Show/hide the QR code
+                if (data.showQR) {
+                    // Generate the QR code URL using the API
+                    qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(clickerUrl)}`;
+                    qrUrl.innerHTML = clickerUrl;
+                    qrContainer.classList.remove('hidden');
+                } else {
+                    qrContainer.classList.add('hidden');
                 }
             }
         });
