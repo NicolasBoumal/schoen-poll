@@ -30,7 +30,7 @@
             stroke-linejoin: round;
             
             pointer-events: none; /* Dots can be clicked "through" labels */
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: Palatino Linotype, Book Antiqua, Palatino, FreeSerif, serif; /* Maybe removing this makes it inherit the style from container? */
         }
     </style>
 
@@ -160,8 +160,8 @@
                     .append("circle")
                     .attr("r", radius)
                     .attr("fill", d => colorScale(d.choice))
-                    .attr("stroke", "#fff")
-                    .attr("stroke-width", 1)
+                    // .attr("stroke", "#fff")  -- uncomment these two lines if you want a border around the circles
+                    // .attr("stroke-width", 1)
                     .attr("cx", d => d.x)
                     .attr("cy", d => d.y)
                     // Merge handles both new and updating circles
