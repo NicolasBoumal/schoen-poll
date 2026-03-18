@@ -110,24 +110,33 @@
         function handleStateChange(data) {
             let isNewQuestionLoad = false;
             
-            // Check if this is a new question, or if we just refreshed the page
+            // Check if the question ID from Firebase is different from our local memory
             if (data.active_question_id !== activeQuestionId) {
                 activeQuestionId = data.active_question_id;
                 currentSelection = null;
                 isNewQuestionLoad = true; 
-                clicksRemaining = 5;
+
+                // PERSISTENCE: Check if this matches the "active" one in storage
+                const savedId = localStorage.getItem('active_poll_id');
+                if (savedId === activeQuestionId) {
+                    // Same question as before refresh, load the saved clicks
+                    clicksRemaining = parseInt(localStorage.getItem('active_poll_clicks')) || 0;
+                } else {
+                    // Brand new question or first time seeing this ID
+                    clicksRemaining = 5;
+                    localStorage.setItem('active_poll_id', activeQuestionId);
+                    localStorage.setItem('active_poll_clicks', clicksRemaining);
+                }
             }
 
-            optionsContainer.innerHTML = ''; // Clear old buttons
+            optionsContainer.innerHTML = ''; 
 
-            // Set the main text
             if (data.status === "open") {
-                statusMessage.innerText = "Select an answer:";
+                updateStatusUI(); // Use the helper to show clicks remaining
             } else {
                 statusMessage.innerText = "Polling is currently closed.";
             }
 
-            // Generate the buttons
             data.options.forEach(optionText => {
                 const btn = document.createElement('button');
                 btn.className = 'option-btn';
@@ -140,11 +149,9 @@
                 }
 
                 if (currentSelection === optionText) btn.classList.add('selected');
-                
                 optionsContainer.appendChild(btn);
             });
 
-            // If we just loaded the question, ask the database if we already voted
             if (isNewQuestionLoad) {
                 restorePreviousAnswer(activeQuestionId);
             }
@@ -180,20 +187,24 @@
                 // Only decrement if they actually changed their mind or made a new choice
                 if (isChange) {
                     clicksRemaining--;
+                    localStorage.setItem('active_poll_clicks', clicksRemaining);
                 }
-
-                // Provide a subtle clue about remaining moves
-                if (clicksRemaining > 0) {
-                    if (clicksRemaining <= 3) {
-                        statusMessage.innerText = `Changing your mind? Max ${clicksRemaining} more.`;
-                    }
-                } else {
-                    statusMessage.innerText = "Final answer locked in.";
-                }
+                updateStatusUI();
 
             } catch (error) {
                 console.error("Error:", error);
                 statusMessage.innerText = "Connection error. Please tap again.";
+            }
+        }
+
+        function updateStatusUI() {
+            if (clicksRemaining > 0) {
+                if (clicksRemaining <= 3) {
+                    const timesText = clicksRemaining === 1 ? "time" : "times";
+                    statusMessage.innerText = `You can change your answer ${clicksRemaining} more ${timesText}.`;   
+                }
+            } else {
+                statusMessage.innerText = "Final answer locked in.";
             }
         }
 
