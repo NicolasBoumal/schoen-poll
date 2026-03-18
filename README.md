@@ -6,7 +6,7 @@ Feel free to copy it.
 2. Allow authentication with Google and as Anonymous user.
 3. Create a NoSQL Firestore database (not a Realtime Database): free tier should be plenty enough with this.
 4. Set the access rules (reach out to me).
-5. Under Security -> Setting -> Authorized domains, make sure to include the domain from where your webpages will be served (include localhost and 127.0.0.1 while testing).
+5. Under Security -> Setting -> Authorized domains, make sure to include the domain from where your webpages will be served (include localhost and 127.0.0.1 while testing). (There is also a limit on how many new users can sign up in a short period of time, which may be important to change before using this in a big lecture room: TBD whether this applies to anonymous users too.)
 6. Copy the files from this repo and serve them from wherever (e.g., using Github Pages).
 7. In each file, look for "PASTE YOUR FIREBASE CONFIG HERE": copy your data there (provided by Firebase, under Settings -> General).
 
