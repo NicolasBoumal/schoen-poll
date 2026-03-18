@@ -12,7 +12,9 @@
             padding: 15px 20px; font-size: 1.2em; cursor: pointer;
             border: 2px solid #4285F4; border-radius: 8px;
             background: white; color: #4285F4; transition: all 0.2s;
+            transition: transform 0.1s;
         }
+        button.option-btn:active { transform: scale(0.96); }
         button.option-btn:hover { background: #f0f4ff; }
         button.option-btn.selected { background: #4285F4; color: white; }
         button.option-btn:disabled { border-color: #ccc; color: #999; cursor: not-allowed; background: #f9f9f9; }
@@ -28,7 +30,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // PASTE YOUR FIREBASE CONFIG HERE
         const firebaseConfig = {
@@ -145,25 +147,44 @@
             }
         }
 
-        // 4. Send the vote to the database
+        // 4. Send the vote (or delete it)
         async function submitAnswer(selectedOption, clickedButton) {
             if (!currentUser || !activeQuestionId) return;
 
-            // Optimistically update the UI so it feels instant
+            const answerRef = doc(db, "questions", activeQuestionId, "answers", currentUser.uid);
+
+            // IF the user clicks the ALREADY selected button:
+            if (currentSelection === selectedOption) {
+                try {
+                    // 1. Optimistically update UI
+                    currentSelection = null;
+                    clickedButton.classList.remove('selected');
+
+                    // 2. Delete from Database
+                    await deleteDoc(answerRef);
+                } catch (error) {
+                    console.error("Error removing answer:", error);
+                }
+                return; // Exit the function here
+            }
+
+            // OTHERWISE: Proceed with normal selection/overwrite
             currentSelection = selectedOption;
             document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
             clickedButton.classList.add('selected');
 
             try {
-                // Write to: questions/{questionId}/answers/{userId}
-                const answerRef = doc(db, "questions", activeQuestionId, "answers", currentUser.uid);
                 await setDoc(answerRef, {
                     choice: selectedOption,
                     timestamp: serverTimestamp()
                 });
             } catch (error) {
                 console.error("Error saving answer:", error);
-                statusMessage.innerText = "Error saving answer. Trying again...";
+                // Clear the selection so the UI matches the (failed) database state
+                currentSelection = null;
+                document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                
+                statusMessage.innerHTML = "<span style='color: #EA4335;'>⚠️ Something went wrong. Try again?</span>";
             }
         }
 
