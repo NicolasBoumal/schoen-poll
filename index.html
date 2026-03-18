@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Lecture Poll</title>
+    <title>Schoen Poll - Clicker</title>
     <style>
         body { font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; }
         #statusMessage { color: #666; margin-bottom: 20px; font-style: italic; }
@@ -24,7 +24,7 @@
 <body>
 
     <h2>Schoen Poll</h2>
-    <div id="statusMessage">Connecting to the lecture...</div>
+    <div id="statusMessage">Connecting...</div>
     <div id="optionsContainer" class="options-container"></div>
 
     <script type="module">
@@ -32,7 +32,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // PASTE YOUR FIREBASE CONFIG HERE
         const firebaseConfig = {
             apiKey: "AIzaSyCRpILPQ5n3PimcVlQTl2g1oJ5zwR2Xing",
             authDomain: "my-live-polling.firebaseapp.com",
