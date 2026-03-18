@@ -32,6 +32,10 @@
             pointer-events: none; /* Dots can be clicked "through" labels */
             font-family: Palatino Linotype, Book Antiqua, Palatino, FreeSerif, serif; /* Maybe removing this makes it inherit the style from container? */
         }
+        #resultsChart .circle {
+            stroke: #fff;
+            stroke-width: 1px;
+        }
     </style>
 
 </head>
@@ -155,20 +159,16 @@
             function ticked() {
                 const circles = svg.selectAll("circle").data(nodes, d => d.id);
 
-                // Add new circles
+                // Add new circles (only append the shape and static attributes like radius)
                 circles.enter()
                     .append("circle")
+                    .attr("class", "circle")
                     .attr("r", radius)
-                    .attr("fill", d => colorScale(d.choice))
-                    // .attr("stroke", "#fff")  -- uncomment these two lines if you want a border around the circles
-                    // .attr("stroke-width", 1)
-                    .attr("cx", d => d.x)
-                    .attr("cy", d => d.y)
                     // Merge handles both new and updating circles
                     .merge(circles)
                     .attr("cx", d => d.x)
                     .attr("cy", d => d.y)
-                    .attr("fill", d => colorScale(d.choice)); // Update color if they changed their mind
+                    .attr("fill", d => colorScale(d.choice)); // Update color dynamically
 
                 // Remove old circles
                 circles.exit().remove();
