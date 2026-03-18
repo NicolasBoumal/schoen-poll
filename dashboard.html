@@ -90,6 +90,10 @@
 
         // 2. Setup D3 Canvas and Physics Simulation
         function initSwarm(options) {
+
+            if (simulation) {
+                simulation.stop();
+            }
             currentOptions = options;
             nodes = []; // Clear old dots
 
