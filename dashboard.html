@@ -32,7 +32,7 @@
             pointer-events: none; /* Dots can be clicked "through" labels */
             font-family: Palatino Linotype, Book Antiqua, Palatino, FreeSerif, serif; /* Maybe removing this makes it inherit the style from container? */
         }
-        #resultsChart .circle {
+        #resultsChart circle {
             stroke: #fff;
             stroke-width: 1px;
         }
@@ -162,7 +162,6 @@
                 // Add new circles (only append the shape and static attributes like radius)
                 circles.enter()
                     .append("circle")
-                    .attr("class", "circle")
                     .attr("r", radius)
                     // Merge handles both new and updating circles
                     .merge(circles)
