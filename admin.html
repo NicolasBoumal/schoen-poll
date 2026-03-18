@@ -224,7 +224,7 @@
 
         // Simulation button
         document.getElementById('simulateBtn').addEventListener('click', () => {
-            if (!currentLiveState.active_question_id) {
+            if (!currentLiveState || !currentLiveState.active_question_id) {
                 alert("Launch a question first!");
                 return;
             }
@@ -234,37 +234,36 @@
             let votesSent = 0;
             const totalToSimulate = 100;
 
-            statusText.innerText = "Simulating traffic...";
+            statusText.innerText = "Simulating organic traffic...";
 
-            const interval = setInterval(async () => {
+            // Recursive function to create random timing
+            function sendNextVote() {
                 if (votesSent >= totalToSimulate) {
-                    clearInterval(interval);
                     statusText.innerText = "Simulation complete.";
                     return;
                 }
 
-                // 1. Pick a random option
                 const randomOption = options[Math.floor(Math.random() * options.length)];
-                
-                // 2. Generate a fake User ID string
-                const fakeUserId = "sim_" + Math.random().toString(36).substring(2, 15);
-
-                // 3. Write directly to the answers subcollection
-                // Note: This works because your Admin account has 'isAdmin()' permissions in rules
+                const fakeUserId = "sim_" + Math.random().toString(36).substring(2, 10);
                 const answerRef = doc(db, "questions", questionId, "answers", fakeUserId);
-                
-                try {
-                    await setDoc(answerRef, {
-                        choice: randomOption,
-                        timestamp: serverTimestamp(),
-                        isSimulated: true // Useful if you want to filter them out later
-                    });
+
+                setDoc(answerRef, {
+                    choice: randomOption,
+                    timestamp: serverTimestamp(),
+                    isSimulated: true
+                }).then(() => {
                     votesSent++;
-                } catch (e) {
+                    
+                    // Pick a random delay between 20ms and 250ms for the next vote
+                    const nextDelay = Math.floor(Math.random() * 230) + 20;
+                    setTimeout(sendNextVote, nextDelay);
+                }).catch(e => {
                     console.error("Sim error:", e);
-                    clearInterval(interval);
-                }
-            }, 50); // Sends a vote every 50ms (adjust for a faster/slower trickle)
+                });
+            }
+
+            // Start the chain
+            sendNextVote();
         });
 
     </script>
