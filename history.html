@@ -40,37 +40,57 @@
         .date-header { font-size: 1.4rem; color: #555; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
 
         /* Question Cards */
-        .question-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; border-left: 5px solid #4285F4; }
+        .question-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
         .question-time { font-size: 0.9rem; color: #888; margin-bottom: 10px; font-weight: bold; }
         
-        /* Options Grid: Flexbox makes it naturally adapt whether there are 2, 3, or 4 items */
-        .options-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        /* Stacked Bar Chart */
+        .stacked-bar-container { margin-top: 15px; }
         
-        /* Individual Option Stats */
-        .option-stat {
-            position: relative;
-            flex: 1 1 calc(25% - 10px); /* Tries to fit 4 across, wraps if needed */
-            min-width: 120px;
-            background: #f0f4f8;
-            border-radius: 6px;
-            overflow: hidden;
+        .stacked-bar {
             display: flex;
-            flex-direction: column;
+            width: 100%;
+            height: 36px;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #e2e8f0; /* Fallback for 0 votes */
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .stacked-segment {
+            height: 100%;
+            display: flex;
+            align-items: center;
             justify-content: center;
-            padding: 12px 15px;
-            border: 1px solid #e2e8f0;
-            z-index: 1;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-shadow: 0px 1px 2px rgba(0,0,0,0.4);
+            white-space: nowrap;
+            overflow: hidden;
+            transition: width 0.3s ease;
         }
 
-        /* The visual "Bar" behind the text */
-        .option-bar-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            background: #dbeafe; /* Light blue */
-            z-index: -1;
-            transition: width 0.5s ease-out;
+        /* Legend underneath the bar */
+        .legend-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.95rem;
+            color: #4a5568;
+        }
+        
+        .legend-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            margin-right: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
 
         .option-label { font-weight: bold; color: #2d3748; margin-bottom: 5px; font-size: 1.1rem; }
@@ -100,7 +120,7 @@
         import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         
         // Import your config
-        import { firebaseConfig } from "./config.js";
+        import { firebaseConfig, colors } from "./config.js";
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -218,20 +238,55 @@
                         const optionsGrid = document.createElement('div');
                         optionsGrid.className = 'options-grid';
 
-                        q.options.forEach(opt => {
-                            const count = q.tallies[opt];
-                            const percentage = q.totalVotes > 0 ? Math.round((count / q.totalVotes) * 100) : 0;
+                        const barContainer = document.createElement('div');
+                        barContainer.className = 'stacked-bar-container';
 
-                            const statDiv = document.createElement('div');
-                            statDiv.className = 'option-stat';
-                            
-                            statDiv.innerHTML = `
-                                <div class="option-bar-bg" style="width: ${percentage}%;"></div>
-                                <span class="option-label">${opt}</span>
-                                <span class="option-count">${count} vote${count !== 1 ? 's' : ''} (${percentage}%)</span>
+                        const barDiv = document.createElement('div');
+                        barDiv.className = 'stacked-bar';
+
+                        const legendDiv = document.createElement('div');
+                        legendDiv.className = 'legend-grid';
+
+                        q.options.forEach((opt, index) => {
+                            const count = q.tallies[opt] || 0;
+                            const percentage = q.totalVotes > 0 ? (count / q.totalVotes) * 100 : 0;
+                            const color = colors[index % colors.length]; // Cycles colors if > 6 options
+
+                            // 1. Build the colored bar segment
+                            if (percentage > 0) {
+                                const segment = document.createElement('div');
+                                segment.className = 'stacked-segment';
+                                segment.style.width = `${percentage}%`;
+                                segment.style.backgroundColor = color;
+                                
+                                // Only show the % text inside the bar if the chunk is wide enough (> 5%)
+                                if (percentage > 5) {
+                                    segment.innerText = `${Math.round(percentage)}%`;
+                                }
+                                barDiv.appendChild(segment);
+                            }
+
+                            // 2. Build the corresponding legend item
+                            const legendItem = document.createElement('div');
+                            legendItem.className = 'legend-item';
+                            legendItem.innerHTML = `
+                                <div class="legend-swatch" style="background-color: ${color};"></div>
+                                <strong>${opt}</strong>&nbsp;— ${count} vote${count !== 1 ? 's' : ''} (${Math.round(percentage)}%)
                             `;
-                            optionsGrid.appendChild(statDiv);
+                            legendDiv.appendChild(legendItem);
                         });
+
+                        // Handle edge case where a poll was launched but got 0 votes
+                        if (q.totalVotes === 0) {
+                            barDiv.innerHTML = '<div style="width: 100%; text-align: center; color: #888; line-height: 36px; font-size: 0.9rem;">No votes recorded</div>';
+                        }
+
+                        barContainer.appendChild(barDiv);
+                        barContainer.appendChild(legendDiv);
+                        card.appendChild(barContainer);
+                        
+                        // Finally, append to the group
+                        groupDiv.appendChild(card);
 
                         card.appendChild(optionsGrid);
                         groupDiv.appendChild(card);
