@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+
     <title>Schoen Poll - Results</title>
 
     <!-- Include all three of these on your webpage.
@@ -23,15 +23,18 @@
 
     <!-- Then also include these lines anywhere on your webpage.
          It's hidden by default: the Admin remote toggles reveal/hide. -->
-    <button id="pollLoginBtn">Admin Login</button>
-    <div id="live-poll-overlay">
-        <svg id="resultsChart"></svg>
+    <div id="schoenPollLoginSection">
+        <button id="spLoginBtn">Schoen Poll Login</button>
+        <div id="spAuthMessage"></div>
     </div>
-    <div id="qr-container" class="hidden">
-        <div class="qr-card">
-            <img id="qr-image" src="" alt="Scan to join">
+    <div id="schoenPollOverlay">
+        <svg id="spChart"></svg>
+    </div>
+    <div id="schoenPollQRContainer" class="hidden">
+        <div class="spQRCard">
+            <img id="spQRimage" src="" alt="Scan to join">
             <p>Scan to join the poll! Or go to:</p>
-            <code id="qr-url"></code>
+            <code id="spQRurl"></code>
         </div>
     </div>
 

@@ -1,11 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import { firebaseConfig, clickerUrl, colors } from "./config.js";
+import { initAdminAuth } from "./adminauth.js";
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
 
 // 2. State & D3 Variables
@@ -20,38 +19,27 @@ let currentQuestionId = null;
 
 // 3. Wait for the DOM to load before grabbing elements
 document.addEventListener("DOMContentLoaded", () => {
-    const loginBtn = document.getElementById('pollLoginBtn');
-    const overlay = document.getElementById('live-poll-overlay');
-    const qrContainer = document.getElementById('qr-container');
-    const qrImage = document.getElementById('qr-image');
-    const qrUrl = document.getElementById('qr-url');
+    const overlay = document.getElementById('schoenPollOverlay');
+    const qrContainer = document.getElementById('schoenPollQRContainer');
+    const qrImage = document.getElementById('spQRimage');
+    const qrUrl = document.getElementById('spQRurl');
 
     // Authentication Logic
-    if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
-            const provider = new GoogleAuthProvider();
-            
-            // Detect if the page is being rendered inside OBS Studio
-            const isOBS = navigator.userAgent.includes("OBS");
-
-            if (isOBS) {
-                // OBS blocks popups, so we must use redirect
-                signInWithRedirect(auth, provider).catch(err => console.error(err));
-            } else {
-                // Standard browsers use popup to avoid cross-site cookie blocking
-                signInWithPopup(auth, provider).catch(err => {
-                    console.error("Login Failed:", err);
-                });
-            }
-        });
-    }
-
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            if (loginBtn) loginBtn.classList.add('hidden'); // Hide button once logged in
+    initAdminAuth(app, db, {
+        loginSection: document.getElementById('schoenPollLoginSection'),
+        loginBtn: document.getElementById('spLoginBtn'),
+        authMessage: document.getElementById('spAuthMessage')
+    }, {
+        onAdminSuccess: (user) => {
             startListening();
-        } else {
-            if (loginBtn) loginBtn.classList.remove('hidden');
+        },
+        onLoggedOut: () => {
+            if (simulation) simulation.stop();
+            if (unsubscribeLiveState) unsubscribeLiveState();
+            if (unsubscribeDisplayState) unsubscribeDisplayState();
+            if (unsubscribeAnswers) unsubscribeAnswers();
+            overlay.style.visibility = "hidden"; // this way, SVG retains its size.
+            qrContainer.classList.add('hidden'); // this would not be ok for the SVG.
         }
     });
 
@@ -106,11 +94,11 @@ document.addEventListener("DOMContentLoaded", () => {
         currentOptions = options;
         nodes = [];
 
-        const svg = d3.select("#resultsChart");
+        const svg = d3.select("#spChart");
         svg.selectAll("*").remove(); // Wipe clean
         
         // Use clientWidth/Height of the container to scale dynamically
-        const container = document.getElementById("resultsChart");
+        const container = document.getElementById("spChart");
         const width = container.clientWidth || 900;
         const height = container.clientHeight || 400;
 
@@ -170,11 +158,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (tallies.has(choice)) tallies.set(choice, tallies.get(choice) + 1);
             });
 
-            d3.select("#resultsChart").selectAll(".label").text(d => `${d} (${tallies.get(d)})`).raise(); // raise() makes the text appear on top of circles
+            d3.select("#spChart").selectAll(".label").text(d => `${d} (${tallies.get(d)})`).raise(); // raise() makes the text appear on top of circles
 
             nodes = nodes.filter(n => newVotesMap.has(n.id));
 
-            const width = document.getElementById("resultsChart").clientWidth || 900;
+            const width = document.getElementById("spChart").clientWidth || 900;
 
             newVotesMap.forEach((choice, id) => {
                 const existingNode = nodes.find(n => n.id === id);

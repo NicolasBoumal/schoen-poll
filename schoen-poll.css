@@ -1,4 +1,4 @@
-#live-poll-overlay {
+#schoenPollOverlay {
     position: fixed;
     width: 100%;
     height: 100%;
@@ -12,14 +12,14 @@
 }
 
 /* Make the SVG take the full space of the overlay */
-#resultsChart {
+#spChart {
     width: 100%;
     height: 100%;
     overflow: visible;
 }
 
 /* Style the labels (possible answers)  */
-#resultsChart .label {
+#spChart .label {
     font-size: 3.5rem;
     font-weight: 700;
     fill: #2c3e50; /* text color */
@@ -34,13 +34,13 @@
     pointer-events: none; /* Dots can be clicked "through" labels */
     font-family: Palatino Linotype, Book Antiqua, Palatino, FreeSerif, serif; /* Maybe removing this makes it inherit the style from container? */
 }
-#resultsChart circle {
+#spChart circle {
     stroke: #fff;
-    stroke-width: 1px;
+    stroke-width: 0px; /* if you want a border around the circles */
 }
 
 /* Unobtrusive login button for admin */
-#pollLoginBtn {
+#spLoginBtn {
     position: fixed;
     top: 10px;
     right: 10px;
@@ -53,10 +53,9 @@
     font-size: 12px;
     pointer-events: auto;
 }
-.hidden { display: none !important; }
 
 /* QR code */
-#qr-container {
+#schoenPollQRContainer {
     position: fixed;
     top: 50%;
     left: 50%;
@@ -69,22 +68,21 @@
     text-align: center;
     pointer-events: auto; /* Allow interaction if needed */
 }
-.qr-card img {
+.spQRCard img {
     width: 300px;
     height: 300px;
 }
-.qr-card p {
+.spQRCard p {
     font-family: system-ui, sans-serif;
     font-size: 1.5rem;
     font-weight: bold;
     margin: 20px 0 10px 0;
 }
-.qr-card code {
+.spQRCard code {
     background: #f0f0f0;
     padding: 5px 10px;
     border-radius: 4px;
     font-size: 1rem;
 }
-#qr-container.hidden {
-    display: none;
-}
+
+.hidden { display: none !important; }
