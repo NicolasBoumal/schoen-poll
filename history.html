@@ -125,6 +125,7 @@
         <h2>Schoen Poll History</h2>
         <p>Admin access required.</p>
         <button id="loginBtn">Log in with Google</button>
+        <div id="authMessage"></div>
     </div>
 
     <div id="historySection" class="hidden">
@@ -136,28 +137,30 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, getDocs, getDoc, query, orderBy, deleteDoc, doc, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         
         import { firebaseConfig, colors } from "./config.js";
+        import { initAdminAuth } from "./adminauth.js";
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
 
         const loginSection = document.getElementById('loginSection');
         const historySection = document.getElementById('historySection');
         const historyContainer = document.getElementById('historyContainer');
 
-        document.getElementById('loginBtn').addEventListener('click', () => {
-            signInWithPopup(auth, new GoogleAuthProvider());
-        });
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                loginSection.classList.add('hidden');
+        initAdminAuth(app, db, {
+            loginSection: loginSection,
+            loginBtn: document.getElementById('loginBtn'),
+            authMessage: document.getElementById('authMessage')
+        }, {
+            onAdminSuccess: (user) => {
                 historySection.classList.remove('hidden');
                 loadHistory();
+            },
+            onLoggedOut: () => {
+                historySection.classList.add('hidden');
+                historyContainer.innerHTML = '<div class="no-data">Loading history data...</div>'; 
             }
         });
 
