@@ -7,10 +7,10 @@
     <title>Schoen Poll - Clicker</title>
     
     <!-- These are just for the favicon. -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/site.webmanifest">
+    <link rel="apple-touch-icon" sizes="180x180" href="/schoen-poll/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/schoen-poll/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/schoen-poll/favicon-16x16.png">
+    <link rel="manifest" href="/schoen-poll/site.webmanifest">
 
     <style>
         body { font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; }
@@ -58,7 +58,7 @@
         // 1. Log the student in silently as anonymous user (unless it's me, connected as admin)
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // If a user is already logged in (Admin or Student), just use that session
+                // If a user is already logged in, just use that session
                 console.log("Session detected: ", user.isAnonymous ? "Anonymous" : "Authenticated");
                 currentUser = user;
 
