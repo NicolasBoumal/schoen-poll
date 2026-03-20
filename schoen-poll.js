@@ -10,6 +10,7 @@ const db = getFirestore(app);
 
 // 2. State & D3 Variables
 let unsubscribeLiveState = null;
+let unsubscribeDisplayState = null; // Listener for the presentation flags
 let unsubscribeAnswers = null;
 let simulation;
 let nodes = [];
@@ -56,22 +57,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 4. Firebase Listeners
     function startListening() {
+        
+        // 1. Listen to Live State (Core Poll Data)
         unsubscribeLiveState = onSnapshot(doc(db, "state", "live"), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                
-                // Toggle visibility based on the 'reveal' boolean
-                if (data.reveal && data.active_question_id) {
-                    overlay.style.visibility = "visible";
-                } else {
-                    overlay.style.visibility = "hidden";
-                }
 
                 // If the question ID changed, reset the swarm
                 if (data.active_question_id && data.active_question_id !== currentQuestionId) {
                     currentQuestionId = data.active_question_id; // Store the new ID
                     initSwarm(data.options);
                     listenToAnswers(data.active_question_id);
+                }
+            }
+        });
+
+        // 2. Listen to Display State (Presentation Flags)
+        unsubscribeDisplayState = onSnapshot(doc(db, "state", "display"), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                
+                // Toggle visibility based on the 'reveal' boolean
+                // We also check currentQuestionId to ensure a poll is actually loaded
+                if (data.reveal && currentQuestionId) {
+                    overlay.style.visibility = "visible";
+                } else {
+                    overlay.style.visibility = "hidden";
                 }
 
                 // Show/hide the QR code

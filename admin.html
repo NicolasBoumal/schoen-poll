@@ -136,8 +136,10 @@
 
         // State Variables
         let currentLiveState = {};
+        let currentDisplayState = { reveal: false, showQR: false };
         let unsubscribeAnswers = null;
         let unsubscribeLiveState = null;
+        let unsubscribeDisplayState = null;
         let seenUserIds = new Set();
         let currentVoteCount = 0;
 
@@ -165,6 +167,7 @@
 
         // Listeners
         function setupAdminListeners() {
+            // 1. Listen to the core live state (for open/close and active question)
             unsubscribeLiveState = onSnapshot(doc(db, "state", "live"), (docSnap) => {
                 if (docSnap.exists()) {
                     currentLiveState = docSnap.data();
@@ -177,7 +180,18 @@
                         toggleBtn.style.background = "#34A853"; 
                     }
 
-                    if (currentLiveState.reveal) {
+                    if (currentLiveState.active_question_id) {
+                        listenToAdminVotes(currentLiveState.active_question_id);
+                    }
+                }
+            });
+
+            // 2. Listen to the new display state (for reveal and QR)
+            unsubscribeDisplayState = onSnapshot(doc(db, "state", "display"), (docSnap) => {
+                if (docSnap.exists()) {
+                    currentDisplayState = docSnap.data();
+
+                    if (currentDisplayState.reveal) {
                         revealBtn.innerText = "Hide Answers";
                         revealBtn.style.opacity = "0.7";
                     } else {
@@ -185,14 +199,10 @@
                         revealBtn.style.opacity = "1";
                     }
 
-                    if (currentLiveState.showQR) {
+                    if (currentDisplayState.showQR) {
                         qrToggleBtn.innerText = "Hide QR Code";
                     } else {
                         qrToggleBtn.innerText = "Show QR Code";
-                    }
-
-                    if (currentLiveState.active_question_id) {
-                        listenToAdminVotes(currentLiveState.active_question_id);
                     }
                 }
             });
@@ -200,6 +210,7 @@
 
         function cleanupListeners() {
             if (unsubscribeLiveState) unsubscribeLiveState();
+            if (unsubscribeDisplayState) unsubscribeDisplayState();
             if (unsubscribeAnswers) unsubscribeAnswers();
         }
 
@@ -222,13 +233,20 @@
                     timestamp: serverTimestamp(),
                     options: optionsArray
                 });
+                
+                // Write to live state
                 await setDoc(doc(db, "state", "live"), {
                     active_question_id: questionRef.id,
                     status: "open",
-                    reveal: false,
-                    options: optionsArray,
-                    user_count: seenUserIds.size
+                    options: optionsArray
                 });
+
+                // Reset the display state for the new question
+                await setDoc(doc(db, "state", "display"), {
+                    reveal: false,
+                    showQR: false
+                });
+
                 statusText.innerText = `Launched: ${optionsArray.join(', ')}`;
                 setTimeout(() => statusText.innerText = "", 3000);
             } catch (error) {
@@ -254,30 +272,27 @@
             }
         });
 
-        // Reveal Toggle
+        // Reveal Toggle - Writes to state/display
         revealBtn.addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return;
-            await setDoc(doc(db, "state", "live"), { 
-                reveal: !currentLiveState.reveal,
-                user_count: seenUserIds.size 
+            await setDoc(doc(db, "state", "display"), { 
+                reveal: !currentDisplayState.reveal
             }, { merge: true });
         });
 
-        // Status Toggle
+        // Status Toggle - Writes to state/live
         toggleBtn.addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return; 
             const newStatus = currentLiveState.status === "open" ? "closed" : "open";
             await setDoc(doc(db, "state", "live"), { 
-                status: newStatus,
-                user_count: seenUserIds.size 
+                status: newStatus
             }, { merge: true });
         });
 
-        // QR Toggle
+        // QR Toggle - Writes to state/display
         qrToggleBtn.addEventListener('click', async () => {
-            const newState = !currentLiveState.showQR;
-            await setDoc(doc(db, "state", "live"), { 
-                showQR: newState 
+            await setDoc(doc(db, "state", "display"), { 
+                showQR: !currentDisplayState.showQR
             }, { merge: true });
         });
 
