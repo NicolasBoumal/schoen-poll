@@ -6,6 +6,7 @@ Feel free to copy it.
 
  -- Nicolas Boumal, March 2026
 
+
 ## Setup
 
 Create a [Firebase](https://console.firebase.google.com) project. No need for analytics.
@@ -36,6 +37,8 @@ Usage should be self explanatory. In a nutshell:
 * In Firebase, under Security -> Settings -> Sign-up quota, you will see that Firebase limits "the number of new Email/Password and Anonymous accounts that your application can create in a day from a single IP address". This may create friction with hundreds students in a lecture room, connected on the same WiFi: they might have the same IP address. The client side webpage should instruct users to temporarily switch to cellular data if that happens (once they are logged in, it's fine: they can go back to WiFi). That said, you can also increase the quota ahead of the first lecture. The change only lasts for a few days though, and may take an hour to kick in.
 
 * To display the results, you need to be logged in as an admin. If somehow this isn't the case on the machine that should display the results, do this: (1) open the remote (`admin.html`), (2) in the extra options below, click the log out button, and (3) log in again, making sure to use your admin account. (4) Reload the page that displays the results.
+
+* The `results.html` page can be included as a "browser" source in [OBS](https://obsproject.com/): it will make the background transparent. This provides a means to overlay the vote bubbles and the QR code on top of your powerpoint / keynote / iPad goodnotes / ... seamlessly, still controlled by the admin remote (on your phone). The overlay only appears on the screen you share or on the virtual camera, so the presenter view stays clean.
 
 
 ## Firebase access rules

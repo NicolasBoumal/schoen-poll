@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, signInWithPopup, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import { firebaseConfig, clickerUrl } from "./config.js";
@@ -31,7 +31,20 @@ document.addEventListener("DOMContentLoaded", () => {
     // Authentication Logic
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
-            signInWithRedirect(auth, new GoogleAuthProvider()).catch(err => console.error(err));
+            const provider = new GoogleAuthProvider();
+            
+            // Detect if the page is being rendered inside OBS Studio
+            const isOBS = navigator.userAgent.includes("OBS");
+
+            if (isOBS) {
+                // OBS blocks popups, so we must use redirect
+                signInWithRedirect(auth, provider).catch(err => console.error(err));
+            } else {
+                // Standard browsers use popup to avoid cross-site cookie blocking
+                signInWithPopup(auth, provider).catch(err => {
+                    console.error("Login Failed:", err);
+                });
+            }
         });
     }
 
