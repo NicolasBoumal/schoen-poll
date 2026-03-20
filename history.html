@@ -61,7 +61,7 @@
             height: 36px;
             border-radius: 8px;
             overflow: hidden;
-            background-color: #e2e8f0; /* Fallback for 0 votes */
+            background-color: #e2e8f0; 
             box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
         }
         
@@ -102,9 +102,6 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
 
-        .option-label { font-weight: bold; color: #2d3748; margin-bottom: 5px; font-size: 1.1rem; }
-        .option-count { font-size: 0.9rem; color: #4a5568; }
-        
         .no-data { text-align: center; color: #888; font-style: italic; margin-top: 50px; }
 
         /* Trash button styling */
@@ -118,7 +115,6 @@
         }
         .delete-day-btn:hover {
             opacity: 1;
-            /* Optional: Add a slight red tint on hover for destructive actions */
             filter: drop-shadow(0 0 2px rgba(220, 53, 69, 0.5)); 
         }
     </style>
@@ -141,9 +137,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, getDocs, query, orderBy, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, getDoc, query, orderBy, deleteDoc, doc, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         
-        // Import your config
         import { firebaseConfig, colors } from "./config.js";
 
         const app = initializeApp(firebaseConfig);
@@ -168,11 +163,24 @@
 
         async function loadHistory() {
             try {
+                historyContainer.innerHTML = '<div class="no-data">Loading history data...</div>';
+
+                // 1. GATEKEEPER: Identify the currently live question
+                const liveStateSnap = await getDoc(doc(db, "state", "live"));
+                let activeQuestionId = null;
+                
+                if (liveStateSnap.exists()) {
+                    const liveData = liveStateSnap.data();
+                    if (liveData.status === "open") {
+                        activeQuestionId = liveData.active_question_id;
+                    }
+                }
+
                 // Fetch all questions
                 const qSnap = await getDocs(query(collection(db, "questions")));
                 const questionsRaw = [];
 
-                // Fetch answers for each question concurrently
+                // Fetch answers and cache them if they haven't been cached yet
                 const promises = qSnap.docs.map(async (docSnap) => {
                     const data = docSnap.data();
                     if (!data.timestamp) return; // Skip if timestamp is somehow missing/pending
@@ -184,20 +192,40 @@
                     const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                     const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-                    // Initialize tallies
-                    const tallies = {};
-                    data.options.forEach(opt => tallies[opt] = 0);
+                    let tallies = {};
                     let totalVotes = 0;
+                    
+                    const isLiveQuestion = (docSnap.id === activeQuestionId);
 
-                    // Fetch the answers subcollection for this specific question
-                    const ansSnap = await getDocs(collection(db, `questions/${docSnap.id}/answers`));
-                    ansSnap.forEach(ansDoc => {
-                        const choice = ansDoc.data().choice;
-                        if (tallies[choice] !== undefined) {
-                            tallies[choice]++;
-                            totalVotes++;
+                    // 2. CACHE CHECK: Do we already have the computed results?
+                    if (data.finalTallies !== undefined && data.totalVotes !== undefined) {
+                        tallies = data.finalTallies;
+                        totalVotes = data.totalVotes;
+                    } else {
+                        // Not cached: Compute them from the answers subcollection
+                        data.options.forEach(opt => tallies[opt] = 0);
+                        
+                        const ansSnap = await getDocs(collection(db, `questions/${docSnap.id}/answers`));
+                        ansSnap.forEach(ansDoc => {
+                            const choice = ansDoc.data().choice;
+                            if (tallies[choice] !== undefined) {
+                                tallies[choice]++;
+                                totalVotes++;
+                            }
+                        });
+
+                        // 3. CACHE SAVE: Only save if it's NOT the live question and actually got votes
+                        if (!isLiveQuestion && totalVotes > 0) {
+                            try {
+                                await setDoc(doc(db, "questions", docSnap.id), {
+                                    finalTallies: tallies,
+                                    totalVotes: totalVotes
+                                }, { merge: true });
+                            } catch (err) {
+                                console.error("Failed to cache tallies for question " + docSnap.id, err);
+                            }
                         }
-                    });
+                    }
 
                     // Skip questions that received no votes at all
                     if (totalVotes === 0) return;
@@ -238,7 +266,7 @@
                     return groupedByDate[b].maxTime - groupedByDate[a].maxTime;
                 });
 
-                historyContainer.innerHTML = ''; // Clear loading text
+                historyContainer.innerHTML = ''; 
 
                 // Render the UI
                 sortedDates.forEach(date => {
@@ -251,18 +279,18 @@
                     const dateTitle = document.createElement('span');
                     dateTitle.innerText = date;
 
+                    // Sort Questions within the day FIRST, so the delete button can access them
+                    const dayItems = groupedByDate[date].items.sort((a, b) => a.timestampMs - b.timestampMs);
+
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'delete-day-btn';
-                    deleteBtn.innerHTML = '🗑️'; // Native emoji, works perfectly on all devices
+                    deleteBtn.innerHTML = '🗑️'; 
                     deleteBtn.title = "Delete all questions for this day";
                     deleteBtn.onclick = () => deleteDay(date, dayItems);
 
                     dateHeader.appendChild(dateTitle);
                     dateHeader.appendChild(deleteBtn);
                     groupDiv.appendChild(dateHeader);
-
-                    // Sort Questions within the day: Ascending (Earliest time first)
-                    const dayItems = groupedByDate[date].items.sort((a, b) => a.timestampMs - b.timestampMs);
 
                     dayItems.forEach(q => {
                         const card = document.createElement('div');
@@ -272,9 +300,6 @@
                         timeHeader.className = 'question-time';
                         timeHeader.innerText = `${q.timeStr} — ${q.totalVotes} total votes`;
                         card.appendChild(timeHeader);
-
-                        const optionsGrid = document.createElement('div');
-                        optionsGrid.className = 'options-grid';
 
                         const barContainer = document.createElement('div');
                         barContainer.className = 'stacked-bar-container';
@@ -288,7 +313,7 @@
                         q.options.forEach((opt, index) => {
                             const count = q.tallies[opt] || 0;
                             const percentage = q.totalVotes > 0 ? (count / q.totalVotes) * 100 : 0;
-                            const color = colors[index % colors.length]; // Cycles colors if > 6 options
+                            const color = colors[index % colors.length]; 
 
                             // 1. Build the colored bar segment
                             if (percentage > 0) {
@@ -314,19 +339,10 @@
                             legendDiv.appendChild(legendItem);
                         });
 
-                        // Handle edge case where a poll was launched but got 0 votes (won't trigger since we normally skip those)
-                        if (q.totalVotes === 0) {
-                            barDiv.innerHTML = '<div style="width: 100%; text-align: center; color: #888; line-height: 36px; font-size: 0.9rem;">No votes recorded</div>';
-                        }
-
                         barContainer.appendChild(barDiv);
                         barContainer.appendChild(legendDiv);
                         card.appendChild(barContainer);
                         
-                        // Finally, append to the group
-                        groupDiv.appendChild(card);
-
-                        card.appendChild(optionsGrid);
                         groupDiv.appendChild(card);
                     });
 
@@ -339,7 +355,7 @@
             }
         }
 
-        // Function to delete all questions for a specific day
+        // Batched delete function
         async function deleteDay(dateStr, dayItems) {
             if (!confirm(`Are you sure you want to delete all ${dayItems.length} questions from ${dateStr}?\n\nThis cannot be undone.`)) {
                 return;
@@ -352,22 +368,19 @@
                 let opCount = 0;
 
                 for (const q of dayItems) {
-                    // Fetch all answers for the question
                     const ansSnap = await getDocs(collection(db, `questions/${q.id}/answers`));
                     
                     for (const ansDoc of ansSnap.docs) {
                         batch.delete(ansDoc.ref);
                         opCount++;
                         
-                        // A single batch can hold a maximum of 500 operations
                         if (opCount === 490) {
                             await batch.commit();
-                            batch = writeBatch(db); // Start a new batch
+                            batch = writeBatch(db);
                             opCount = 0;
                         }
                     }
                     
-                    // Delete the parent question document
                     batch.delete(doc(db, "questions", q.id));
                     opCount++;
                     
@@ -378,7 +391,6 @@
                     }
                 }
 
-                // Commit any remaining operations in the final batch
                 if (opCount > 0) {
                     await batch.commit();
                 }
