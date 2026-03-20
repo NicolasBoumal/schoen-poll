@@ -76,12 +76,17 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 2. The Answers: users can only edit their own answer. Admins have full access.
+    // 2. The Display State: admins only
+    match /state/display {
+      allow read, write: if isAdmin();
+    }
+
+    // 3. The Answers: users can edit their own answer. Admins have full access.
     match /questions/{questionId}/answers/{userId} {
       allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
     }
 
-    // 3. The Question History: only admins can record questions and tallies.
+    // 4. The Question History: only admins can record questions and read tallies.
     match /questions/{questionId} {
       allow read, write: if isAdmin();
     }
