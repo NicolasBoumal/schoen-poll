@@ -15,7 +15,7 @@ In there:
 
 1. Under Security -> Authentication, click "get started" and allow authentication both with Google and as Anonymous user.
 2. Under Database & Storage, create a NoSQL Cloud Firestore database, standard edition (not a Realtime Database): free tier should be plenty enough with this.
-3. Under the "Rules" tab, set the access rules for that database (copy-paste code below).
+3. Under the "Rules" tab, set the access rules for that database (copy-paste code below). Don't forget to *edit the list of admins*!
 4. Under Security -> Authentication -> Settings -> Authorized domains, make sure to include the domain from where your webpages will be served (include localhost and 127.0.0.1 for local testing).
 5. Under Settings -> General, under "Your Apps", select the "Web" icon to create your web app. (You may want to enable hosting too; I did not because I use GitHub Pages for hosting).
 6. The previous step generated some text with a `firebaseConfig` object: copy this somewhere.
