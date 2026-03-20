@@ -137,7 +137,6 @@
         // State Variables
         let currentLiveState = {};
         let unsubscribeAnswers = null;
-        let unsubscribePresence = null;
         let unsubscribeLiveState = null;
         let seenUserIds = new Set();
         let currentVoteCount = 0;
@@ -166,11 +165,6 @@
 
         // Listeners
         function setupAdminListeners() {
-            unsubscribePresence = onSnapshot(collection(db, "presence"), (snapshot) => {
-                snapshot.forEach(doc => seenUserIds.add(doc.id));
-                updateCountsUI();
-            });
-
             unsubscribeLiveState = onSnapshot(doc(db, "state", "live"), (docSnap) => {
                 if (docSnap.exists()) {
                     currentLiveState = docSnap.data();
@@ -205,7 +199,6 @@
         }
 
         function cleanupListeners() {
-            if (unsubscribePresence) unsubscribePresence();
             if (unsubscribeLiveState) unsubscribeLiveState();
             if (unsubscribeAnswers) unsubscribeAnswers();
         }
@@ -294,11 +287,6 @@
             // if (!confirm("Wipe presence count? This deletes presence records.")) return;
             statusText.innerText = "Resetting...";
             try {
-                const presenceSnap = await getDocs(collection(db, "presence"));
-                const promises = [];
-                presenceSnap.forEach(d => promises.push(deleteDoc(d.ref)));
-                await Promise.all(promises);
-                
                 seenUserIds.clear();
                 if (currentLiveState.active_question_id) {
                     const ansSnap = await getDocs(collection(db, "questions", currentLiveState.active_question_id, "answers"));

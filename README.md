@@ -65,18 +65,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
-    
-    // 2. The Presence sheet: users can manage their own, admins have full access to count/reset.
-    match /presence/{userId} {
-      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
-    }
 
-    // 3. The Answers: users can only edit their own answer. Admins have full access.
+    // 2. The Answers: users can only edit their own answer. Admins have full access.
     match /questions/{questionId}/answers/{userId} {
       allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
     }
 
-    // 4. The Question History: only admins can record questions and tallies.
+    // 3. The Question History: only admins can record questions and tallies.
     match /questions/{questionId} {
       allow read, write: if isAdmin();
     }

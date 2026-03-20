@@ -61,11 +61,6 @@
                 // If a user is already logged in (Admin or Student), just use that session
                 console.log("Session detected: ", user.isAnonymous ? "Anonymous" : "Authenticated");
                 currentUser = user;
-                
-                // Register presence
-                setDoc(doc(db, "presence", user.uid), { 
-                    last_seen: serverTimestamp() 
-                }, { merge: true });
 
                 // Start the app logic
                 startListeningToLiveState();
