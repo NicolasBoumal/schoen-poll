@@ -68,17 +68,17 @@
     text-align: center;
     pointer-events: auto; /* Allow interaction if needed */
 }
-.spQRCard img {
+#schoenPollQRContainer img {
     width: 300px;
     height: 300px;
 }
-.spQRCard p {
+#schoenPollQRContainer p {
     font-family: system-ui, sans-serif;
     font-size: 1.5rem;
     font-weight: bold;
     margin: 20px 0 10px 0;
 }
-.spQRCard code {
+#schoenPollQRContainer code {
     background: #f0f0f0;
     padding: 5px 10px;
     border-radius: 4px;
