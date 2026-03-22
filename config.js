@@ -12,4 +12,4 @@ export const firebaseConfig = {
 export const clickerUrl = "https://nicolasboumal.github.io/schoen-poll/";
 
 // Custom color palette for results (bubbles)
-export const colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2", "#64B5CD", "#CCB974"];
+export const colors = ["#4C72B0", "#55A868", "#8172B2", "#64B5CD", "#CCB974", "#C44E52"];
