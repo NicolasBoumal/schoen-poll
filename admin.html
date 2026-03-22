@@ -67,7 +67,7 @@
         .tally-box span { font-size: 1.5rem; font-weight: bold; color: #4285F4; }
 
         .controls-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; }
-        #toggleStatusBtn { background: #EA4335; color: white; padding: 18px; font-size: 1.2rem; }
+        #toggleOpenCloseBtn { background: #EA4335; color: white; padding: 18px; font-size: 1.2rem; }
         #revealBtn { background: #FBBC05; color: black; padding: 18px; font-size: 1.2rem; }
         
         /* The Finish Button (De-escalated design) */
@@ -127,7 +127,7 @@
             <div id="liveTallies" class="tallies-grid"></div>
 
             <div class="controls-grid">
-                <button id="toggleStatusBtn">Close Poll</button>
+                <button id="toggleOpenCloseBtn">Close Poll</button>
                 <button id="revealBtn">Reveal Answers</button>
             </div>
 
@@ -165,7 +165,7 @@
         const liveTallies = document.getElementById('liveTallies');
         
         const revealBtn = document.getElementById('revealBtn');
-        const toggleBtn = document.getElementById('toggleStatusBtn');
+        const toggleOpenCloseBtn = document.getElementById('toggleOpenCloseBtn');
         const finishBtn = document.getElementById('finishBtn');
         const qrToggleBtn = document.getElementById('qrToggleBtn');
         const reactivateBtn = document.getElementById('reactivateBtn');
@@ -277,11 +277,11 @@
                 activePollTitle.innerText = `Active: ${currentLiveState.options.join(' / ')}`;
 
                 if (status === "open") {
-                    toggleBtn.innerText = "Close Poll";
-                    toggleBtn.style.background = "#EA4335"; 
+                    toggleOpenCloseBtn.innerText = "Close Poll";
+                    toggleOpenCloseBtn.style.background = "#EA4335"; 
                 } else {
-                    toggleBtn.innerText = "Re-open Poll";
-                    toggleBtn.style.background = "#34A853"; 
+                    toggleOpenCloseBtn.innerText = "Re-open Poll";
+                    toggleOpenCloseBtn.style.background = "#34A853"; 
                 }
 
                 if (currentLiveState.active_question_id) {
@@ -377,8 +377,10 @@
         });
 
         // Status Toggle - Writes to state/live
-        toggleBtn.addEventListener('click', async () => {
+        toggleOpenCloseBtn.addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return; 
+            // Defensively abort if the poll is already complete (shouldn't happen)
+            if (currentLiveState.status === "complete") return;
             const newStatus = currentLiveState.status === "open" ? "closed" : "open";
             await setDoc(doc(db, "state", "live"), { 
                 status: newStatus
