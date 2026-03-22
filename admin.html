@@ -20,7 +20,21 @@
             font-family: system-ui, -apple-system, sans-serif; 
             margin: 0; padding: 15px; 
             background: #f4f7f6; color: #333;
+            /* NEW: Flexbox setup */
+            box-sizing: border-box;
+            min-height: 100vh;
+            min-height: 100dvh; 
+            display: flex;
+            flex-direction: column;
         }
+        
+        /* Make the admin section fill the space */
+        #adminSection {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        
         .hidden { display: none !important; }
         
         /* Top Bar & Real Toggle Switch */
@@ -67,32 +81,34 @@
         /* Control Deck & Chart */
         .chart-container {
             position: relative;
-            height: 275px; 
+            height: 280px;
             width: 100%;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }
 
-        .controls-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px; }
-        #toggleOpenCloseBtn { background: #EA4335; color: white; padding: 18px; font-size: 1.2rem; }
-        #revealBtn { background: #FBBC05; color: black; padding: 18px; font-size: 1.2rem; }
+        .controls-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        #toggleOpenCloseBtn { background: #EA4335; color: white; padding: 15px; font-size: 1.2rem; }
+        #revealBtn { background: #FBBC05; color: black; padding: 15px; font-size: 1.2rem; }
         
-        /* The Finish Button (De-escalated design) */
+        /* The Finish Button */
         .hollow-btn {
             background: transparent; color: #555; border: 2px solid #aaa;
-            padding: 15px; font-size: 1rem; margin-top: 10px;
+            padding: 12px; font-size: 1rem; margin-top: 5px; /* Tighter margins */
             box-shadow: none;
         }
 
         /* Advanced Admin Tools */
-        details { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; }
+        details { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 10px; }
         summary { font-weight: bold; color: #666; cursor: pointer; outline: none; }
         .admin-tools { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
         .tool-btn { padding: 12px; font-size: 0.9rem; background: #e0e0e0; color: #333; box-shadow: none; }
         .danger-btn { background: #ffcdd2; color: #c62828; }
         
-        #loginSection { text-align: center; margin-top: 50px; }
+        #loginSection { text-align: center; margin-top: auto; margin-bottom: auto; }
         #loginBtn { background: #4285F4; color: white; padding: 15px; font-size: 1.2rem; }
-        #statusText { text-align: center; color: #666; height: 20px; margin-top: 10px; font-size: 0.9rem; }
+        
+        /* Note: margin-top: auto pushes it down */
+        #statusText { text-align: center; color: #666; height: 20px; font-size: 0.9rem; margin-top: auto; }
     </style>
 </head>
 <body>
