@@ -413,11 +413,10 @@
                     options: optionsArray
                 });
 
-                // Reset the display state for the new question
+                // Reset the display state for the new question, preserving other states (QR)
                 await setDoc(doc(db, "state", "display"), {
-                    reveal: false,
-                    showQR: currentDisplayState.showQR // Keep QR state
-                });
+                    reveal: false
+                }, { merge: true });
 
             } catch (error) {
                 console.error("Error launching:", error);
@@ -528,7 +527,7 @@
             
             function sendVote() {
                 if (count >= 100) return (statusText.innerText = "Simulation done.");
-                setDoc(doc(db, "questions", qId, "answers", "sim_" + Math.random().toString(36).substring(2)), {
+                setDoc(doc(db, "questions", qId, "answers", "sim_" + Math.floor(Math.random() * 301).toString().padStart(3, '0')), {
                     choice: opts[Math.floor(Math.random() * opts.length)],
                     timestamp: serverTimestamp(), isSimulated: true
                 }).then(() => {
