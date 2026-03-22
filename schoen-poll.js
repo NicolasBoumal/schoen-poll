@@ -15,6 +15,7 @@ let simulation;
 let nodes = [];
 let currentOptions = [];
 let currentRadius = 12;
+let baseBubbleSize = 1.0;
 let currentQuestionId = null;
 
 // 3. Wait for the DOM to load before grabbing elements
@@ -83,6 +84,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     qrContainer.classList.remove('hidden');
                 } else {
                     qrContainer.classList.add('hidden');
+                }
+
+                // Listen for bubble size changes
+                const newBaseSize = data.bubbleSize || 1.0;
+                if (newBaseSize !== baseBubbleSize) {
+                    baseBubbleSize = newBaseSize;
+                    updateBubbleSizes(); // Re-calculate and nudge the physics engine
                 }
             }
         });
@@ -177,7 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            currentRadius = Math.max(4, Math.min(25, 350 / Math.sqrt(Math.max(1, nodes.length))));
+            updateBubbleSizes();
 
             if (simulation) {
                 simulation.force("collide", d3.forceCollide(currentRadius + 1).strength(1).iterations(3));
@@ -187,3 +195,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+// Helper to resize bubbles instantly when the size slider moves
+function updateBubbleSizes() {
+    if (!nodes.length) return;
+    
+    // 1. Calculate the new radius
+    currentRadius = Math.max(4, Math.min(25, 350 / Math.sqrt(Math.max(1, nodes.length)))) * baseBubbleSize;
+    
+    // 2. Apply it to the physics engine
+    if (simulation) {
+        simulation.force("collide", d3.forceCollide().radius(currentRadius + 1).iterations(2));
+        simulation.alpha(0.3).restart(); 
+    }
+}

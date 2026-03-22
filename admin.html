@@ -178,6 +178,12 @@
                 <button class="tool-btn" id="reactivateBtn" style="background: #ff9800; color: white;">Undo: reactivate previous question</button>
                 <button class="tool-btn" id="simulateBtn">Simulate 100 votes</button>
                 <button class="tool-btn danger-btn" id="resetPresenceBtn">Reset presence count</button>
+                <div style="background: #e0e0e0; padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; box-shadow: none;">
+                    <label for="bubbleSizeSlider" style="font-size: 0.9rem; font-weight: bold; color: #333; display: flex; justify-content: space-between;">
+                        Bubble Size Multiplier <span><span id="bubbleSizeLabel">1.0</span>x</span>
+                    </label>
+                    <input type="range" id="bubbleSizeSlider" min="0.3" max="3.0" step="0.1" value="1.0" style="width: 100%;">
+                </div>
                 <button class="tool-btn" id="logoutBtn" style="background: #555; color: white;">Log out</button>
             </div>
         </details>
@@ -206,6 +212,8 @@
         const reactivateBtn = document.getElementById('reactivateBtn');
         const simulateBtn = document.getElementById('simulateBtn');
         const statusText = document.getElementById('statusText');
+        const bubbleSizeSlider = document.getElementById('bubbleSizeSlider');
+        const bubbleSizeLabel = document.getElementById('bubbleSizeLabel');
 
         // State Variables
         let currentLiveState = {};
@@ -365,6 +373,11 @@
                         qrToggleCheckbox.checked = false;
                         qrToggleLabel.style.color = "#666";
                     }
+
+                    // Update slider from database (default to 1.0)
+                    const size = currentDisplayState.bubbleSize || 1.0;
+                    bubbleSizeSlider.value = size;
+                    bubbleSizeLabel.innerText = parseFloat(size).toFixed(1);
                 }
             });
         }
@@ -589,6 +602,18 @@
                 });
             }
             sendVote();
+        });
+
+        // Bubble size controls
+        bubbleSizeSlider.addEventListener('input', (e) => {
+            // Update the label smoothly while dragging
+            bubbleSizeLabel.innerText = parseFloat(e.target.value).toFixed(1);
+        });
+        bubbleSizeSlider.addEventListener('change', async (e) => {
+            // Save to Firestore when the user lets go of the slider
+            await setDoc(doc(db, "state", "display"), { 
+                bubbleSize: parseFloat(e.target.value) 
+            }, { merge: true });
         });
 
     </script>
