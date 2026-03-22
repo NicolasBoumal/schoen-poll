@@ -116,7 +116,7 @@
         <div class="top-bar">
             <h2>Schoen Poll Remote</h2>
             <div class="toggle-container">
-                <span id="qrToggleLabel">QR: OFF</span>
+                <span id="qrToggleLabel">Show QR: OFF</span>
                 <label class="switch">
                     <input type="checkbox" id="qrToggleCheckbox">
                     <span class="slider"></span>
@@ -267,11 +267,11 @@
                     // Update QR Toggle UI
                     if (currentDisplayState.showQR) {
                         qrToggleCheckbox.checked = true;
-                        qrToggleLabel.innerText = "QR: ON";
+                        qrToggleLabel.innerText = "Show QR: ON";
                         qrToggleLabel.style.color = "#673ab7";
                     } else {
                         qrToggleCheckbox.checked = false;
-                        qrToggleLabel.innerText = "QR: OFF";
+                        qrToggleLabel.innerText = "Show QR: OFF";
                         qrToggleLabel.style.color = "#666";
                     }
                 }
