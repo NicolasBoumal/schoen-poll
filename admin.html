@@ -83,7 +83,7 @@
         }
 
         /* Advanced Admin Tools */
-        details { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 30px; }
+        details { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; }
         summary { font-weight: bold; color: #666; cursor: pointer; outline: none; }
         .admin-tools { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
         .tool-btn { padding: 12px; font-size: 0.9rem; background: #e0e0e0; color: #333; box-shadow: none; }
@@ -129,8 +129,6 @@
         </div>
 
         <div id="controlDeckSection" class="hidden">
-            <h3 id="activePollTitle">Active Poll</h3>
-
             <div class="chart-container">
                 <canvas id="talliesChart"></canvas>
             </div>
@@ -171,7 +169,6 @@
         // UI Elements
         const launchpadSection = document.getElementById('launchpadSection');
         const controlDeckSection = document.getElementById('controlDeckSection');
-        const activePollTitle = document.getElementById('activePollTitle');
         
         const revealBtn = document.getElementById('revealBtn');
         const toggleOpenCloseBtn = document.getElementById('toggleOpenCloseBtn');
@@ -356,8 +353,6 @@
                 controlDeckSection.classList.remove('hidden');
                 simulateBtn.disabled = false;
                 reactivateBtn.disabled = true; // Can't undo while a poll is actively running
-
-                activePollTitle.innerText = `Active: ${currentLiveState.options.join(' / ')}`;
 
                 if (status === "open") {
                     toggleOpenCloseBtn.innerText = "Close Poll";
