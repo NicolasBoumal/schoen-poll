@@ -48,8 +48,8 @@
 <body>
 
     <h2>Schoen Poll</h2>
-    <div id="statusMessage" class="status-info">Connecting...</div>
     <div id="optionsContainer" class="options-container"></div>
+    <div id="statusMessage" class="status-info">Connecting...</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -166,10 +166,17 @@
 
             optionsContainer.innerHTML = ''; 
 
+            // If the poll is completely finished, clear the options and show waiting text
+            if (data.status === "complete") {
+                showStatus("Waiting for the next question to launch...", "info");
+                return; // Stop executing, which leaves the optionsContainer empty
+            }
+
+            // Otherwise, handle open/closed
             if (data.status === "open") {
                 updateStatusUI(); 
-            } else {
-                showStatus("Polling is currently closed.", "info");
+            } else if (data.status === "closed") {
+                showStatus("This question is closed.", "info");
             }
 
             data.options.forEach(optionText => {
