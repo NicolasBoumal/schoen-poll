@@ -108,7 +108,8 @@
         <div class="top-bar">
             <h2>Schoen Poll Remote</h2>
             <div class="toggle-container">
-                <span id="qrToggleLabel">Show QR</span> <label class="switch">
+                <span id="qrToggleLabel">Show QR</span>
+                <label class="switch">
                     <input type="checkbox" id="qrToggleCheckbox">
                     <span class="slider"></span>
                 </label>
@@ -160,7 +161,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { firebaseConfig } from "./config.js";
+        
+        import { firebaseConfig, colors } from "./config.js";
         import { initAdminAuth } from "./adminauth.js";
 
         const app = initializeApp(firebaseConfig);
@@ -193,7 +195,6 @@
 
         // Chart variables
         let liveChart = null; 
-        const chartColors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#9C27B0', '#00BCD4', '#FF9800', '#795548'];
 
         // Plugin to draw text in the center of the doughnut
         const centerTextPlugin = {
@@ -234,10 +235,14 @@
             const ctx = document.getElementById('talliesChart').getContext('2d');
             const labels = currentLiveState.options;
             const dataPoints = labels.map(opt => optionTallies.get(opt) || 0);
+            
+            // --> 2. MAP CYCLIC COLORS FOR THE CHART
+            const dynamicColors = labels.map((_, i) => colors[i % colors.length]);
 
             if (liveChart) {
                 liveChart.data.labels = labels;
                 liveChart.data.datasets[0].data = dataPoints;
+                liveChart.data.datasets[0].backgroundColor = dynamicColors; // Ensure colors update properly
                 liveChart.update();
             } else {
                 liveChart = new Chart(ctx, {
@@ -247,7 +252,7 @@
                         labels: labels,
                         datasets: [{
                             data: dataPoints,
-                            backgroundColor: chartColors.slice(0, labels.length),
+                            backgroundColor: dynamicColors,
                             borderWidth: 2,
                             borderColor: '#ffffff'
                         }]
@@ -284,7 +289,8 @@
             },
             onLoggedOut: () => {
                 adminSection.classList.add('hidden');
-                cleanupListeners(); }
+                cleanupListeners(); 
+            }
         });
 
         // Listeners
@@ -380,7 +386,7 @@
                 optionTallies.clear();
                 
                 snapshot.forEach(doc => {
-                    seenUserIds.add(doc.id); // Add to global presence
+                    seenUserIds.add(doc.id); 
                     const choice = doc.data().choice;
                     optionTallies.set(choice, (optionTallies.get(choice) || 0) + 1);
                 });
