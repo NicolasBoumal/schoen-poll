@@ -68,27 +68,43 @@ service cloud.firestore {
              request.auth.token.email in ["first-admin@gmail.com", "second-admin@gmail.com"];
     }
 
-    // 1. The Live State: everyone can read it, only admins can change it.
-    //    This allows the clicker to show the buttons immediately, while silent
-    //    authentication runs in the background
+    // 0. By default, just say no.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. The Live State
     match /state/live {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // 2. The Display State: admins only
+    // 2. The Display State
     match /state/display {
       allow read, write: if isAdmin();
     }
 
-    // 3. The Answers: users can edit their own answer. Admins have full access.
+    // 3. The Answers
     match /questions/{questionId}/answers/{userId} {
-      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      // Read & Delete: Only check identity (no data payload exists to validate)
+      allow read, delete: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+      
+      // Create & Update: Check identity and validate the data payload
+      allow create, update: if isAdmin() || (request.auth != null && request.auth.uid == userId && isValidAnswer());
     }
 
-    // 4. The Question History: only admins can record questions and read tallies.
+    // 4. The Question History
     match /questions/{questionId} {
       allow read, write: if isAdmin();
+    }
+    
+    // Limit what can be submitted as an answer by non-admins
+    function isValidAnswer() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['choice', 'timestamp']) &&
+             data.choice is string &&
+             data.choice.size() < 100 &&
+             data.timestamp == request.time; 
     }
   }
 }

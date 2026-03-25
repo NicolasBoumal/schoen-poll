@@ -94,7 +94,7 @@
             }
         }
 
-        // 1. Log the student in silently as anonymous user (unless it's me, connected as admin)
+        // 1. Make sure the user is logged in somehow
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 // If a user is already logged in, just use that session
@@ -102,7 +102,7 @@
                 currentUser = user;
                 startListeningToLiveState();
             } else {
-                // No session found? Only Then sign in anonymously
+                // No session found? Then sign in anonymously
                 console.log("No session found. Signing in anonymously...");
                 
                 // Enforce maximum persistence of the new anonymous session (it is so by default, but let's be explicit)
