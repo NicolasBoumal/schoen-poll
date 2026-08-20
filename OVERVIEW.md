@@ -6,14 +6,14 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 
 - `index.html`: Participant clicker. Users sign in anonymously, listen to `state/live`, and submit or remove one answer per question.
 - `clicker.html`: Alias that redirects to `index.html`.
-- `admin.html`: Admin remote. Google-authenticated admins launch questions, close or reopen voting, reveal or hide results, show the QR code, add private history labels, simulate votes, and adjust result bubble size. It listens to `state/live`, `state/display`, `questions/{questionId}`, and `questions/{questionId}/answers`.
+- `admin.html`: Admin remote. Google-authenticated admins launch questions, close or reopen voting, reveal or hide results, show the QR code, add private history labels, simulate votes, adjust result bubble size, and select a results-page style. It listens to `state/live`, `state/display`, `questions/{questionId}`, and `questions/{questionId}/answers`.
 - `remote.html`: Alias that redirects to `admin.html`.
 - `results.html`: Projector/overlay page. It loads D3, `schoen-poll.js`, and `schoen-poll.css` to render live results. It listens to `state/live`, `state/display`, and `questions/{questionId}/answers`.
 - `history.html`: Admin-only history page. It reads past questions, computes or reuses cached tallies, renders stacked result bars, lets admins edit private question labels, and can delete all questions from a given day. It reads `state/live`, `questions`, and each relevant `questions/{questionId}/answers` subcollection, but does not use live listeners.
 
 ## Shared Files
 
-- `config.js`: Firebase config, clicker URL used for the QR code, result colors, and preset answer-option buttons.
+- `config.js`: Firebase config, clicker URL used for the QR code, result bubble colors, preset answer-option buttons, and named results-page styles. Each results style defines its background and label appearance; the first style is the fallback.
 - `adminauth.js`: Shared Google admin authentication helper. It checks admin status by attempting to read the admin-only `state/display` document.
 - `schoen-poll.js`: Results overlay logic. It listens to Firestore state and answers, then renders a D3 force simulation of answer bubbles.
 - `schoen-poll.css`: Styling for the results overlay, labels, QR modal, and unobtrusive login button.
@@ -30,7 +30,7 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
   - `reveal`: whether the results overlay is visible.
   - `showQR`: whether the QR code is visible.
   - `bubbleSize`: optional multiplier for result bubbles.
-  - `backgroundColor`: optional results-page background in `#RRGGBB` format. An empty or missing value leaves the page's native background unchanged.
+  - `resultStyleId`: id of a style from `resultStyles` in `config.js`. A missing or unknown id selects the first configured style.
 - `questions/{questionId}`
   - `timestamp`: creation timestamp.
   - `label`: optional private admin-facing label for history and recall.
@@ -50,7 +50,7 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 5. Participants open `index.html`, sign in anonymously, listen to `state/live`, and see the active options.
 6. Each participant writes their answer to `questions/{questionId}/answers/{userId}`.
 7. `admin.html` listens to those answers for the live doughnut chart and vote count.
-8. `results.html` listens to `state/live`, `state/display`, and answers. When `reveal` is true, it shows D3 bubbles grouped by option.
+8. `results.html` listens to `state/live`, `state/display`, and answers. It applies the selected results style live, and when `reveal` is true, it shows D3 bubbles grouped by option.
 9. When the admin finishes a question, `state/live.status` becomes `complete` and `state/display.reveal` is reset to false.
 10. `history.html` later reads questions and answers, caches final tallies where useful, and displays grouped history by day.
 
@@ -60,4 +60,5 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 - Firebase Authentication must allow Google sign-in for admins and anonymous sign-in for participants.
 - Firestore rules are central to the design: public read access is only for `state/live`, participants can only read/write their own answer documents, and admin-only pages rely on admin access to protected documents.
 - The same `colors` palette from `config.js` is used by the results bubbles, the admin chart, history bars, and optional colored clicker backgrounds.
+- Results styles in `config.js` control `backgroundColor`, `labelColor`, `labelSize`, `labelOutlineColor`, and `labelOutlineWidth`. Bubble size remains a separate live slider setting in `state/display`.
 - `results.html` is intentionally usable as an overlay source, including in OBS or embedded in presentation tooling.

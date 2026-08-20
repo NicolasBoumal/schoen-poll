@@ -25,7 +25,7 @@ Then:
 7. Copy the files from this repo and serve them from wherever (e.g., using Github Pages or Firebase hosting).
 8. In `config.js`, copy your Firebase config data (see step 6, or go to Settings -> General in Firebase).
 9. In `config.js`, also update `clickerUrl` with the full URL to your clicker (the `index.html` page).
-10. That's also where you can edit the bubble colors and default options.
+10. That's also where you can edit the bubble colors, default answer-options, and results-page styles.
 
 Usage should be self explanatory. In a nutshell:
 
@@ -42,7 +42,7 @@ Usage should be self explanatory. In a nutshell:
 
 * To display the results, you need to be logged in as an admin. If somehow this isn't the case on the machine that should display the results, do this: (1) open the remote (`admin.html`), (2) in the extra options below, click the log out button, and (3) log in again, making sure to use your admin account. (4) Reload the page that displays the results.
 
-* The `results.html` page can be included as a "browser" source in [OBS](https://obsproject.com/): with the Results Background set to "none" in the admin remote (default), its background is transparent. This provides a means to overlay the vote bubbles and the QR code on top of your powerpoint / keynote / iPad goodnotes or Notability / ... seamlessly, still controlled by the admin remote (on your phone). The overlay only appears on the screen you share or on the virtual camera, so the presenter view stays clean. On that note: setting the Results Background to "black" is nice for use with a projector aimed at a board: the background won't show.
+* The `results.html` page can be included as a "browser" source in [OBS](https://obsproject.com/): with the Results Style set to "None" in the admin remote (the default first style), its background is transparent. This provides a means to overlay the vote bubbles and the QR code on top of your powerpoint / keynote / iPad goodnotes or Notability / ... seamlessly, still controlled by the admin remote (on your phone). The overlay only appears on the screen you share or on the virtual camera, so the presenter view stays clean. On that note: the "Black bg" style is nice for use with a projector aimed at a board: the black background won't show, and the labels switch to white for contrast.
 
 * Why Firestore and not real-time database? It's all about how Firebase's [free tier](https://firebase.google.com/pricing) is structured. Firestore allows a few tens of thousands of reads and writes per day: that's fine for a dozen polls in a classroom with a few hundred students. If it's not enough, you can pay for more and it's very cheap (a few *cents* per lecture would do). In contrast, the real-time database would allow vastly more reads and writes per day for free, but it has a cap at 100 simultaneous connections. Since each student establishes a connection, that's a no-go for that free tier. That said, you could sign-up for the pay-as-you-go plan of the real-time database, which lifts the cap to 200'000 simultaneous connections. It is highly unlikely that your usage would ever exceed the free tier within the pay-as-you-go plan, and so this might be the superior option for large audiences. The only downsides would be that you have to attach a credit card to it, and that the code (here) would have to be rewritten partly (an LLM could do it).
 

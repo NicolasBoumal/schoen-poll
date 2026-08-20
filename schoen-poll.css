@@ -20,14 +20,14 @@
 
 /* Style the labels (possible answers)  */
 #spChart .label {
-    font-size: 3.5rem;
+    font-size: var(--sp-label-size, 3.5rem);
     font-weight: 700;
-    fill: #2c3e50; /* text color */
+    fill: var(--sp-label-color, #2c3e50);
     
     /* Have some background behind the text labels for contrast. */
     paint-order: stroke;
-    stroke: white;
-    stroke-width: 15px;
+    stroke: var(--sp-label-outline-color, white);
+    stroke-width: var(--sp-label-outline-width, 15px);
     stroke-linecap: round;
     stroke-linejoin: round;
     

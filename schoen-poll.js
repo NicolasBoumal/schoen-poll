@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-import { firebaseConfig, clickerUrl, colors } from "./config.js";
+import { firebaseConfig, clickerUrl, colors, resultStyles } from "./config.js";
 import { initAdminAuth } from "./adminauth.js";
 
 const app = initializeApp(firebaseConfig);
@@ -93,12 +93,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     updateBubbleSizes(); // Re-calculate and nudge the physics engine
                 }
 
-                // Apply an explicit results background, or restore the page's native background.
-                document.body.style.backgroundColor = /^#[0-9a-fA-F]{6}$/.test(data.backgroundColor)
-                    ? data.backgroundColor
-                    : "";
+                applyResultStyle(data.resultStyleId);
             }
         });
+    }
+
+    function applyResultStyle(resultStyleId) {
+        const style = resultStyles.find((candidate) => candidate.id === resultStyleId) || resultStyles[0];
+        if (!style) return;
+
+        document.body.style.backgroundColor = style.backgroundColor;
+        overlay.style.setProperty('--sp-label-color', style.labelColor);
+        overlay.style.setProperty('--sp-label-size', style.labelSize);
+        overlay.style.setProperty('--sp-label-outline-color', style.labelOutlineColor);
+        overlay.style.setProperty('--sp-label-outline-width', `${style.labelOutlineWidth}px`);
     }
 
     // 5. D3 Physics & Drawing Logic
