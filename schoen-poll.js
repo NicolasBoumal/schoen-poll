@@ -92,6 +92,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     baseBubbleSize = newBaseSize;
                     updateBubbleSizes(); // Re-calculate and nudge the physics engine
                 }
+
+                // Apply an explicit results background, or restore the page's native background.
+                document.body.style.backgroundColor = /^#[0-9a-fA-F]{6}$/.test(data.backgroundColor)
+                    ? data.backgroundColor
+                    : "";
             }
         });
     }

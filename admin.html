@@ -170,6 +170,18 @@
             font-weight: bold;
             color: #333;
         }
+        .background-color-control {
+            background: #e0e0e0;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .background-color-label { font-size: 0.9rem; font-weight: bold; color: #333; }
+        .background-color-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .background-color-btn { padding: 9px 4px; font-size: 0.85rem; background: #f8fafc; color: #333; box-shadow: none; }
+        .background-color-btn.active-state { outline: 3px solid #4285F4; outline-offset: -3px; }
         
         #loginSection { text-align: center; margin-top: auto; margin-bottom: auto; }
         #loginBtn { background: #4285F4; color: white; padding: 15px; font-size: 1.2rem; }
@@ -245,6 +257,15 @@
                     </label>
                     <input type="range" id="bubbleSizeSlider" min="0.3" max="3.0" step="0.1" value="1.0" style="width: 100%;">
                 </div>
+                <div class="background-color-control">
+                    <span class="background-color-label">Results Background</span>
+                    <div class="background-color-buttons">
+                        <button class="background-color-btn" type="button" data-background-color="">None</button>
+                        <button class="background-color-btn" type="button" data-background-color="#000000">Black</button>
+                        <button class="background-color-btn" type="button" data-background-color="#ffffff">White</button>
+                        <button class="background-color-btn" type="button" id="customBackgroundColorBtn">Other…</button>
+                    </div>
+                </div>
                 <button class="tool-btn warning-btn" id="simulateBtn">Simulate 100 votes</button>
                 <button class="tool-btn" id="logoutBtn" style="background: #555; color: white;">Log out</button>
             </div>
@@ -278,6 +299,8 @@
         const statusText = document.getElementById('statusText');
         const bubbleSizeSlider = document.getElementById('bubbleSizeSlider');
         const bubbleSizeLabel = document.getElementById('bubbleSizeLabel');
+        const backgroundColorButtons = document.querySelectorAll('.background-color-btn');
+        const customBackgroundColorBtn = document.getElementById('customBackgroundColorBtn');
         const questionLabelEditor = document.querySelector('.question-label-editor');
         const questionLabelDisplay = document.getElementById('questionLabelDisplay');
 
@@ -449,7 +472,24 @@
                     const size = currentDisplayState.bubbleSize || 1.0;
                     bubbleSizeSlider.value = size;
                     bubbleSizeLabel.innerText = parseFloat(size).toFixed(1);
+
+                    updateBackgroundColorControls(currentDisplayState.backgroundColor || "");
                 }
+            });
+        }
+
+        function updateBackgroundColorControls(backgroundColor) {
+            const normalizedColor = /^#[0-9a-fA-F]{6}$/.test(backgroundColor)
+                ? backgroundColor.toLowerCase()
+                : "";
+
+            backgroundColorButtons.forEach((button) => {
+                const presetColor = button.dataset.backgroundColor;
+                const isPreset = presetColor !== undefined;
+                const isActive = isPreset
+                    ? presetColor === normalizedColor
+                    : normalizedColor !== "" && normalizedColor !== "#000000" && normalizedColor !== "#ffffff";
+                button.classList.toggle('active-state', isActive);
             });
         }
 
@@ -804,6 +844,36 @@
             // Save to Firestore when the user lets go of the slider
             await setDoc(doc(db, "state", "display"), { 
                 bubbleSize: parseFloat(e.target.value) 
+            }, { merge: true });
+        });
+
+        // Results background controls
+        backgroundColorButtons.forEach((button) => {
+            if (button === customBackgroundColorBtn) return;
+
+            button.addEventListener('click', async () => {
+                await setDoc(doc(db, "state", "display"), {
+                    backgroundColor: button.dataset.backgroundColor
+                }, { merge: true });
+            });
+        });
+
+        customBackgroundColorBtn.addEventListener('click', async () => {
+            const currentColor = /^#[0-9a-fA-F]{6}$/.test(currentDisplayState.backgroundColor)
+                ? currentDisplayState.backgroundColor
+                : "#";
+            const requestedColor = window.prompt("Enter a background color in hex format (#RRGGBB):", currentColor);
+
+            if (requestedColor === null) return;
+
+            const backgroundColor = requestedColor.trim();
+            if (!/^#[0-9a-fA-F]{6}$/.test(backgroundColor)) {
+                window.alert("Please enter a color in #RRGGBB format, for example #1a2b3c.");
+                return;
+            }
+
+            await setDoc(doc(db, "state", "display"), {
+                backgroundColor
             }, { merge: true });
         });
 

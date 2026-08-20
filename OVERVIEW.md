@@ -30,6 +30,7 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
   - `reveal`: whether the results overlay is visible.
   - `showQR`: whether the QR code is visible.
   - `bubbleSize`: optional multiplier for result bubbles.
+  - `backgroundColor`: optional results-page background in `#RRGGBB` format. An empty or missing value leaves the page's native background unchanged.
 - `questions/{questionId}`
   - `timestamp`: creation timestamp.
   - `label`: optional private admin-facing label for history and recall.
