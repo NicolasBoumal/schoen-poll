@@ -24,6 +24,10 @@ export const presetButtons = [
     ['True', 'False'],
     ['Yes', 'No', 'Unsure'],
     ['True', 'False', 'Unsure'],
+    ['Oui', 'Non'],
+    ['Vrai', 'Faux'],
+    ['Oui', 'Non', '...?'],
+    ['Vrai', 'Faux', '...?'],
     ['A', 'B', 'C', 'D']
 ];
 
