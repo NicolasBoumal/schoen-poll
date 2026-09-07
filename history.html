@@ -46,7 +46,21 @@
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
+            flex-wrap: wrap;
+            gap: 10px;
         }
+        .date-actions { display: flex; align-items: center; gap: 10px; }
+        .recalculate-day-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: white;
+            color: #1a365d;
+            padding: 7px 10px;
+            cursor: pointer;
+            font: 600 0.85rem system-ui, -apple-system, sans-serif;
+        }
+        .recalculate-day-btn:hover { background: #eaf2ff; }
+        .history-message { color: #555; margin-bottom: 20px; }
 
         /* Question Cards */
         .question-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
@@ -167,7 +181,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, getDoc, query, orderBy, deleteDoc, doc, writeBatch, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, getDocsFromServer, getDocFromServer, doc, writeBatch, setDoc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         
         import { firebaseConfig, colors } from "./config.js";
         import { initAdminAuth } from "./adminauth.js";
@@ -194,12 +208,14 @@
             }
         });
 
-        async function loadHistory() {
+        async function loadHistory(recalculateDate = null) {
             try {
-                historyContainer.innerHTML = '<div class="no-data">Loading history data...</div>';
+                historyContainer.innerHTML = recalculateDate === null
+                    ? '<div class="no-data">Loading history data...</div>'
+                    : '<div class="no-data">Recalculating results...</div>';
 
                 // 1. Identify the currently live question
-                const liveStateSnap = await getDoc(doc(db, "state", "live"));
+                const liveStateSnap = await getDocFromServer(doc(db, "state", "live"));
                 let activeQuestionId = null;
                 
                 if (liveStateSnap.exists()) {
@@ -211,8 +227,9 @@
                 }
 
                 // Fetch all questions
-                const qSnap = await getDocs(query(collection(db, "questions")));
+                const qSnap = await getDocsFromServer(collection(db, "questions"));
                 const questionsRaw = [];
+                let cacheWriteFailures = 0;
 
                 // Fetch answers and cache them if they haven't been cached yet
                 const promises = qSnap.docs.map(async (docSnap) => {
@@ -226,44 +243,42 @@
                     const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                     const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-                    let tallies = {};
+                    let tallies = Object.fromEntries(data.options.map(opt => [opt, 0]));
                     let totalVotes = 0;
                     
                     const isLiveQuestion = (docSnap.id === activeQuestionId);
+                    const forceRecalculate = dateStr === recalculateDate;
 
                     // 2. CACHE CHECK: Do we already have the computed results?
-                    //    Force bypass of the cache if this is the active live question.
-                    if (!isLiveQuestion && data.finalTallies !== undefined && data.totalVotes !== undefined) {
+                    //    Bypass for the active question or a day being recalculated.
+                    if (!isLiveQuestion && !forceRecalculate && data.finalTallies !== undefined && data.totalVotes !== undefined) {
                         tallies = data.finalTallies;
                         totalVotes = data.totalVotes;
                     } else {
-                        // Not cached (or is currently live): Compute them from the answers subcollection
-                        data.options.forEach(opt => tallies[opt] = 0);
-                        
-                        const ansSnap = await getDocs(collection(db, `questions/${docSnap.id}/answers`));
+                        // Read server answers so an offline snapshot cannot become a saved tally.
+                        const ansSnap = await getDocsFromServer(collection(db, `questions/${docSnap.id}/answers`));
                         ansSnap.forEach(ansDoc => {
                             const choice = ansDoc.data().choice;
-                            if (tallies[choice] !== undefined) {
+                            if (Object.prototype.hasOwnProperty.call(tallies, choice)) {
                                 tallies[choice]++;
                                 totalVotes++;
                             }
                         });
 
-                        // 3. CACHE SAVE: Only save if it's NOT the live question and actually got votes
-                        if (!isLiveQuestion && totalVotes > 0) {
+                        // Save even zero votes, replacing any previously nonzero result.
+                        // Live questions are always read afresh and never cached.
+                        if (!isLiveQuestion) {
                             try {
-                                await setDoc(doc(db, "questions", docSnap.id), {
+                                await updateDoc(doc(db, "questions", docSnap.id), {
                                     finalTallies: tallies,
                                     totalVotes: totalVotes
-                                }, { merge: true });
+                                });
                             } catch (err) {
+                                cacheWriteFailures++;
                                 console.error("Failed to cache tallies for question " + docSnap.id, err);
                             }
                         }
                     }
-
-                    // Skip questions that received no votes at all
-                    if (totalVotes === 0) return;
 
                     questionsRaw.push({
                         id: docSnap.id,
@@ -303,6 +318,13 @@
                 });
 
                 historyContainer.innerHTML = ''; 
+                if (cacheWriteFailures > 0) {
+                    const message = document.createElement('div');
+                    message.className = 'history-message';
+                    message.setAttribute('role', 'alert');
+                    message.innerText = 'Results are displayed, but some updated totals could not be saved. Use Recalculate results to retry.';
+                    historyContainer.appendChild(message);
+                }
 
                 // Render the UI
                 sortedDates.forEach(date => {
@@ -318,6 +340,16 @@
                     // Sort Questions within the day FIRST, so the delete button can access them
                     const dayItems = groupedByDate[date].items.sort((a, b) => a.timestampMs - b.timestampMs);
 
+                    const dateActions = document.createElement('div');
+                    dateActions.className = 'date-actions';
+                    const recalculateBtn = document.createElement('button');
+                    recalculateBtn.type = 'button';
+                    recalculateBtn.className = 'recalculate-day-btn';
+                    recalculateBtn.innerText = 'Recalculate results';
+                    recalculateBtn.title = 'Recount answers for all questions on this day';
+                    recalculateBtn.onclick = () => loadHistory(date);
+                    dateActions.appendChild(recalculateBtn);
+
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'delete-day-btn';
                     deleteBtn.innerHTML = '🗑️'; 
@@ -325,10 +357,20 @@
                     deleteBtn.onclick = () => deleteDay(date, dayItems);
 
                     dateHeader.appendChild(dateTitle);
-                    dateHeader.appendChild(deleteBtn);
+                    dateActions.appendChild(deleteBtn);
+                    dateHeader.appendChild(dateActions);
                     groupDiv.appendChild(dateHeader);
 
-                    dayItems.forEach(q => {
+                    // Keep empty days accessible so their results can be recalculated too.
+                    const visibleItems = dayItems.filter(q => q.totalVotes > 0);
+                    if (visibleItems.length === 0) {
+                        const message = document.createElement('p');
+                        message.className = 'history-message';
+                        message.innerText = 'No votes recorded for this day.';
+                        groupDiv.appendChild(message);
+                    }
+
+                    visibleItems.forEach(q => {
                         const card = document.createElement('div');
                         card.className = 'question-card';
 
@@ -389,7 +431,13 @@
 
             } catch (error) {
                 console.error("Error fetching history: ", error);
-                historyContainer.innerHTML = '<div class="no-data">Error loading history. Check console.</div>';
+                historyContainer.innerHTML = '<div class="no-data">Could not load results. Check your connection and try again.</div>';
+                const retryBtn = document.createElement('button');
+                retryBtn.type = 'button';
+                retryBtn.className = 'recalculate-day-btn';
+                retryBtn.innerText = 'Retry';
+                retryBtn.onclick = () => loadHistory(recalculateDate);
+                historyContainer.appendChild(retryBtn);
             }
         }
 

@@ -270,7 +270,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, collection, addDoc, serverTimestamp, onSnapshot, getDocs, deleteField, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         
         import { firebaseConfig, colors, presetButtons, resultStyles } from "./config.js";
         import { initAdminAuth } from "./adminauth.js";
@@ -715,15 +715,6 @@
         revealBtn.addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return;
             
-            // If revealing, save the final tallies to the DB as a backup
-            if (!currentDisplayState.reveal) {
-                const talliesObj = Object.fromEntries(optionTallies);
-                await setDoc(doc(db, "questions", currentLiveState.active_question_id), {
-                    finalTallies: talliesObj,
-                    totalVotes: currentVoteCount
-                }, { merge: true });
-            }
-
             await setDoc(doc(db, "state", "display"), { 
                 reveal: !currentDisplayState.reveal
             }, { merge: true });
@@ -753,15 +744,24 @@
         finishBtn.addEventListener('click', async () => {
             if (!currentLiveState.active_question_id) return; 
             
-            // 1. Mark the question complete (Sends Admin to Launchpad, Clickers to Waiting)
-            await setDoc(doc(db, "state", "live"), { 
-                status: "complete"
-            }, { merge: true });
-
-            // 2. Hide the projector answers automatically
-            await setDoc(doc(db, "state", "display"), { 
-                reveal: false
-            }, { merge: true });
+            try {
+                // Complete and invalidate together so history cannot reuse an old tally.
+                const batch = writeBatch(db);
+                batch.update(doc(db, "questions", currentLiveState.active_question_id), {
+                    finalTallies: deleteField(),
+                    totalVotes: deleteField()
+                });
+                batch.set(doc(db, "state", "live"), {
+                    status: "complete"
+                }, { merge: true });
+                batch.set(doc(db, "state", "display"), {
+                    reveal: false
+                }, { merge: true });
+                await batch.commit();
+            } catch (error) {
+                console.error("Error completing question:", error);
+                statusText.innerText = "Could not complete question. Please try again.";
+            }
         });
 
         // The Top Bar Toggle

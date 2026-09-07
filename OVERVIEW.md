@@ -9,7 +9,7 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 - `admin.html`: Admin remote. Google-authenticated admins launch questions, close or reopen voting, reveal or hide results, show the QR code, add private history labels, simulate votes, adjust result bubble size, and select a results-page style. It listens to `state/live`, `state/display`, `questions/{questionId}`, and `questions/{questionId}/answers`.
 - `remote.html`: Alias that redirects to `admin.html`.
 - `results.html`: Projector/overlay page. It loads D3, `schoen-poll.js`, and `schoen-poll.css` to render live results. It listens to `state/live`, `state/display`, and `questions/{questionId}/answers`.
-- `history.html`: Admin-only history page. It reads past questions, computes or reuses cached tallies, renders stacked result bars, lets admins edit private question labels, and can delete all questions from a given day. It reads `state/live`, `questions`, and each relevant `questions/{questionId}/answers` subcollection, but does not use live listeners.
+- `history.html`: Admin-only history page. It reads past questions, computes or reuses cached tallies, renders stacked result bars, lets admins edit private question labels, and can recalculate results or delete all questions from a given day. It reads `state/live`, `questions`, and each relevant `questions/{questionId}/answers` subcollection, but does not use live listeners.
 
 ## Shared Files
 
@@ -51,14 +51,15 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 6. Each participant writes their answer to `questions/{questionId}/answers/{userId}`.
 7. `admin.html` listens to those answers for the live doughnut chart and vote count.
 8. `results.html` listens to `state/live`, `state/display`, and answers. It applies the selected results style live, and when `reveal` is true, it shows D3 bubbles grouped by option.
-9. When the admin finishes a question, `state/live.status` becomes `complete` and `state/display.reveal` is reset to false.
-10. `history.html` later reads questions and answers, caches final tallies where useful, and displays grouped history by day.
+9. Revealing answers only changes their visibility. When the admin finishes a question, one batch clears its cached tallies, sets `state/live.status` to `complete`, and resets `state/display.reveal` to false. Reopening or reactivating also clears cached tallies.
+10. `history.html` later reads questions and answers from the server, caches tallies (including zero votes) for questions that are no longer live, and displays grouped history by day. Each day's **Recalculate results** button bypasses its cached tallies and replaces them with a fresh count of the answers. Questions with zero votes have no result card, but their day remains available for recalculation and deletion.
 
 ## Notes
 
 - This is designed to be hosted as static files, for example through GitHub Pages.
 - Firebase Authentication must allow Google sign-in for admins and anonymous sign-in for participants.
 - Firestore rules are central to the design: public read access is only for `state/live`, participants can only read/write their own answer documents, and admin-only pages rely on admin access to protected documents.
+- The documented rules do not enforce poll closure on answer writes. Late changes can still make cached history stale; use **Recalculate results** for the affected day. History is a snapshot and does not refresh automatically.
 - The same `colors` palette from `config.js` is used by the results bubbles, the admin chart, history bars, and optional colored clicker backgrounds.
 - Results styles in `config.js` control `backgroundColor`, `labelColor`, `labelSize`, `labelOutlineColor`, and `labelOutlineWidth`. Bubble size remains a separate live slider setting in `state/display`.
 - `results.html` is intentionally usable as an overlay source, including in OBS or embedded in presentation tooling.
