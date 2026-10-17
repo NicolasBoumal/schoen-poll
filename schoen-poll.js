@@ -12,6 +12,7 @@ let unsubscribeLiveState = null;
 let unsubscribeDisplayState = null; // Listener for the presentation flags
 let unsubscribeAnswers = null;
 let simulation;
+let chartResizeObserver = null;
 let nodes = [];
 let currentOptions = [];
 let currentRadius = 12;
@@ -36,6 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         onLoggedOut: () => {
             if (simulation) simulation.stop();
+            if (chartResizeObserver) chartResizeObserver.disconnect();
             if (unsubscribeLiveState) unsubscribeLiveState();
             if (unsubscribeDisplayState) unsubscribeDisplayState();
             if (unsubscribeAnswers) unsubscribeAnswers();
@@ -112,6 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 5. D3 Physics & Drawing Logic
     function initSwarm(options) {
         if (simulation) simulation.stop();
+        if (chartResizeObserver) chartResizeObserver.disconnect();
         currentOptions = options;
         nodes = [];
 
@@ -120,8 +123,8 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Use clientWidth/Height of the container to scale dynamically
         const container = document.getElementById("spChart");
-        const width = container.clientWidth || 900;
-        const height = container.clientHeight || 400;
+        let width = container.clientWidth || 900;
+        let height = container.clientHeight || 400;
 
         // Adjust side margins based on the number of options
         // If 2 options: margin is 30% of width (keeps them closer to center)
@@ -152,6 +155,28 @@ document.addEventListener("DOMContentLoaded", () => {
             .force("collide", d3.forceCollide(currentRadius + 1).strength(1).iterations(3))
             .velocityDecay(0.35)
             .on("tick", ticked);
+
+        chartResizeObserver = new ResizeObserver(() => {
+            const newWidth = container.clientWidth;
+            const newHeight = container.clientHeight;
+            // Hidden presentation containers can temporarily have no size.
+            if (!newWidth || !newHeight || (newWidth === width && newHeight === height)) return;
+
+            width = newWidth;
+            height = newHeight;
+            const newMargin = width * marginFactor;
+            xScale.range([newMargin, width - newMargin]);
+
+            svg.selectAll(".label")
+                .attr("x", d => xScale(d))
+                .attr("y", 0.75 * height);
+
+            // Refresh D3's cached force targets without replacing the vote nodes.
+            simulation.force("x").x(d => xScale(d.choice));
+            simulation.force("y").y(height / 2 - 30);
+            simulation.alpha(Math.max(simulation.alpha(), 0.3)).restart();
+        });
+        chartResizeObserver.observe(container);
 
         function ticked() {
             const circles = svg.selectAll("circle").data(nodes, d => d.id);

@@ -64,3 +64,4 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 - The same `colors` palette from `config.js` is used by the results bubbles, the admin chart, history bars, and optional colored clicker backgrounds.
 - Results styles in `config.js` control `backgroundColor`, `labelColor`, `labelSize`, `labelOutlineColor`, and `labelOutlineWidth`. Bubble size remains a separate live slider setting in `state/display`.
 - `results.html` is intentionally usable as an overlay source, including in OBS or embedded in presentation tooling.
+- The results chart observes its own size and updates label positions and bubble force targets when resized, preserving existing votes and counts. Resizing runs locally and does not add Firestore reads.
