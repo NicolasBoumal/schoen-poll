@@ -56,7 +56,7 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 
 ## Notes
 
-- This is designed to be hosted as static files, for example through GitHub Pages.
+- This is designed to be hosted as static files, for example through GitHub Pages. Icon and manifest paths are relative, so they work at the domain root or under any repository name or subdirectory.
 - Firebase Authentication must allow Google sign-in for admins and anonymous sign-in for participants.
 - Firestore rules are central to the design: public read access is only for `state/live`, participants can only read/write their own answer documents, and admin-only pages rely on admin access to protected documents.
 - The documented rules do not enforce poll closure on answer writes. Late changes can still make cached history stale; use **Recalculate results** for the affected day. History is a snapshot and does not refresh automatically.
