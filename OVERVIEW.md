@@ -13,7 +13,7 @@ Schoen Poll is a static, Firebase-backed live polling system for lectures or pre
 
 ## Shared Files
 
-- `config.js`: Firebase config, clicker URL used for the QR code, result bubble colors, preset answer-option buttons, and named results-page styles. Each results style defines its background and label appearance; the first style is the fallback.
+- `config.js`: Firebase config, clicker URL used for the QR code, result bubble colors, preset answer-option buttons, and named results-page styles. The clicker URL defaults to this module's directory via `import.meta.url`, so embedded results still point to the poll installation; it can be replaced with an explicit URL. Each results style defines its background and label appearance; the first style is the fallback.
 - `adminauth.js`: Shared Google admin authentication helper. It checks admin status by attempting to read the admin-only `state/display` document.
 - `schoen-poll.js`: Results overlay logic. It listens to Firestore state and answers, then renders a D3 force simulation of answer bubbles.
 - `schoen-poll.css`: Styling for the results overlay, labels, QR modal, and unobtrusive login button.

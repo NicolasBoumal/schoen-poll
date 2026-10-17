@@ -8,8 +8,10 @@ export const firebaseConfig = {
     appId: "1:160493309944:web:40201dc27a1749c5a4500d"
 };
 
-// Specify the URL to the clicker here, for the QR code.
-export const clickerUrl = "https://nicolasboumal.github.io/schoen-poll/";
+// QR code URL: defaults to the folder containing this file and index.html.
+// This also works when the results script is embedded on another website.
+// To override, replace the expression below with your clicker's full URL in quotes.
+export const clickerUrl = new URL("./", import.meta.url).href;
 
 
 // Custom color palette for displaying the results (bubbles)
