@@ -302,6 +302,7 @@
         let currentLiveState = {};
         let currentDisplayState = { reveal: false, showQR: false };
         let unsubscribeAnswers = null;
+        let currentAnswersQuestionId = null;
         let unsubscribeLiveState = null;
         let unsubscribeDisplayState = null; 
         let unsubscribeQuestionLabel = null;
@@ -511,6 +512,7 @@
                     liveChart.destroy();
                     liveChart = null;
                 }
+                stopAdminVotesListener();
                 stopQuestionLabelListener();
             } else {
                 // MODE 2: Control Deck
@@ -537,12 +539,20 @@
         function cleanupListeners() {
             if (unsubscribeLiveState) unsubscribeLiveState();
             if (unsubscribeDisplayState) unsubscribeDisplayState();
-            if (unsubscribeAnswers) unsubscribeAnswers();
+            stopAdminVotesListener();
             stopQuestionLabelListener();
         }
 
-        function listenToAdminVotes(questionId) {
+        function stopAdminVotesListener() {
             if (unsubscribeAnswers) unsubscribeAnswers();
+            unsubscribeAnswers = null;
+            currentAnswersQuestionId = null;
+        }
+
+        function listenToAdminVotes(questionId) {
+            if (currentAnswersQuestionId === questionId) return;
+            stopAdminVotesListener();
+            currentAnswersQuestionId = questionId;
             unsubscribeAnswers = onSnapshot(collection(db, "questions", questionId, "answers"), (snapshot) => {
                 currentVoteCount = snapshot.size;
                 optionTallies.clear();
@@ -555,6 +565,11 @@
                 
                 updateCountsUI();
                 updateChart();
+            }, (error) => {
+                unsubscribeAnswers = null;
+                currentAnswersQuestionId = null;
+                console.error("Error listening to votes:", error);
+                statusText.innerText = "Could not load votes. Please refresh the page to retry.";
             });
         }
 
