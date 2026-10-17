@@ -72,7 +72,7 @@
         let colorClickersEnabled = false;
         let currentStatus = null;
         let pendingVote = null;
-        let answerRevision = 0;
+        let answerState = null;
 
         const maxClicksPerQuestion = 6; // Feeling facetious?
         let clicksRemaining = maxClicksPerQuestion;
@@ -165,7 +165,6 @@
 
         // 3. Update UI based on what the Admin is doing
         function handleStateChange(data) {
-            let isNewQuestionLoad = false;
             currentOptions = Array.isArray(data.options) ? data.options : [];
             colorClickersEnabled = data.colorClickers === true;
             currentStatus = data.status;
@@ -175,10 +174,9 @@
                 // The old write may still finish, but must not update this question's UI.
                 if (pendingVote) clearTimeout(pendingVote.statusTimer);
                 pendingVote = null;
-                answerRevision++;
+                answerState = null;
                 activeQuestionId = data.active_question_id;
                 currentSelection = null;
-                isNewQuestionLoad = true; 
 
                 const savedId = localStorage.getItem('active_poll_id');
                 if (savedId === activeQuestionId) {
@@ -214,8 +212,13 @@
             updateAnswerUI();
             updateStatusUI();
 
-            if (isNewQuestionLoad) {
-                restorePreviousAnswer(activeQuestionId);
+            if (!answerState && activeQuestionId) {
+                answerState = {
+                    questionId: activeQuestionId,
+                    confirmedSelection: null,
+                    loadError: null
+                };
+                answerState.ready = restorePreviousAnswer(answerState);
             }
         }
 
@@ -231,7 +234,7 @@
 
         // 4. Send the vote (or delete it)
         async function submitAnswer(selectedOption) {
-            if (!currentUser || !activeQuestionId || currentStatus !== "open" || pendingVote) return;
+            if (!currentUser || !activeQuestionId || !answerState || currentStatus !== "open" || pendingVote) return;
 
             // Block ANY click (selecting or unselecting) if they are out of clicks
             if (clicksRemaining <= 0) {
@@ -239,14 +242,13 @@
                 return;
             }
 
+            const state = answerState;
             const vote = {
                 questionId: activeQuestionId,
-                previousSelection: currentSelection,
                 selection: currentSelection === selectedOption ? null : selectedOption,
                 showPendingStatus: false
             };
             pendingVote = vote;
-            answerRevision++;
             currentSelection = vote.selection;
             updateAnswerUI();
             updateStatusUI();
@@ -261,6 +263,25 @@
             const answerRef = doc(db, "questions", vote.questionId, "answers", currentUser.uid);
             let writeError = null;
             try {
+                // Establish the rollback value before a write can replace the stored answer.
+                // A failed initial read is retried only when the participant taps again.
+                if (state.loadError) {
+                    state.loadError = null;
+                    state.ready = restorePreviousAnswer(state);
+                }
+                await state.ready;
+                if (pendingVote !== vote) return;
+                if (state.loadError) throw state.loadError;
+
+                // A tap still waiting for its initial read has not been sent yet.
+                if (currentStatus !== "open") {
+                    pendingVote = null;
+                    currentSelection = state.confirmedSelection;
+                    updateAnswerUI();
+                    updateStatusUI();
+                    return;
+                }
+
                 if (vote.selection === null) {
                     await deleteDoc(answerRef);
                 } else {
@@ -278,8 +299,9 @@
             pendingVote = null;
 
             if (writeError) {
-                currentSelection = vote.previousSelection;
+                currentSelection = state.confirmedSelection;
             } else {
+                state.confirmedSelection = vote.selection;
                 // Only confirmed actions consume a click.
                 clicksRemaining--;
                 localStorage.setItem('active_poll_clicks', clicksRemaining);
@@ -287,7 +309,9 @@
 
             updateAnswerUI();
             if (writeError && currentStatus === "open") {
-                showStatus("Your change could not be saved. Please try again.", "error");
+                showStatus(state.loadError
+                    ? "Your previous answer could not be loaded. Please tap again to retry."
+                    : "Your change could not be saved. Please try again.", "error");
             } else {
                 updateStatusUI();
             }
@@ -330,19 +354,18 @@
         });
 
         // 5. Check if the user already answered this question
-        async function restorePreviousAnswer(questionId) {
-            if (!currentUser || !questionId) return;
-            const revision = answerRevision;
-
+        async function restorePreviousAnswer(state) {
             try {
-                const answerRef = doc(db, "questions", questionId, "answers", currentUser.uid);
+                const answerRef = doc(db, "questions", state.questionId, "answers", currentUser.uid);
                 const docSnap = await getDoc(answerRef);
+                state.confirmedSelection = docSnap.exists() ? docSnap.data().choice : null;
 
-                // A slow initial read must not overwrite a newer tap or another question.
-                if (activeQuestionId !== questionId || answerRevision !== revision) return;
-                currentSelection = docSnap.exists() ? docSnap.data().choice : null;
+                // Keep an early tap highlighted while retaining its confirmed rollback value.
+                if (answerState !== state || pendingVote) return;
+                currentSelection = state.confirmedSelection;
                 updateAnswerUI();
             } catch (error) {
+                state.loadError = error;
                 console.error("Error fetching previous answer:", error);
             }
         }
