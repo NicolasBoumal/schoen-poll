@@ -49,7 +49,7 @@
 
     <h2>Schoen Poll</h2>
     <div id="optionsContainer" class="options-container"></div>
-    <div id="statusMessage" class="status-info">Connecting...</div>
+    <div id="statusMessage" class="status-info" role="status">Connecting...</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -70,6 +70,9 @@
         let currentSelection = null;
         let currentOptions = [];
         let colorClickersEnabled = false;
+        let currentStatus = null;
+        let pendingVote = null;
+        let answerRevision = 0;
 
         const maxClicksPerQuestion = 6; // Feeling facetious?
         let clicksRemaining = maxClicksPerQuestion;
@@ -165,9 +168,14 @@
             let isNewQuestionLoad = false;
             currentOptions = Array.isArray(data.options) ? data.options : [];
             colorClickersEnabled = data.colorClickers === true;
+            currentStatus = data.status;
             
             // Check if the question ID from Firebase is different from our local memory
             if (data.active_question_id !== activeQuestionId) {
+                // The old write may still finish, but must not update this question's UI.
+                if (pendingVote) clearTimeout(pendingVote.statusTimer);
+                pendingVote = null;
+                answerRevision++;
                 activeQuestionId = data.active_question_id;
                 currentSelection = null;
                 isNewQuestionLoad = true; 
@@ -188,43 +196,42 @@
 
             // If the poll is completely finished, clear the options and show waiting text
             if (data.status === "complete") {
-                showStatus("Waiting for the next question to launch...", "info");
+                updateStatusUI();
                 updateClickerBackground(true);
                 return; // Stop executing, which leaves the optionsContainer empty
-            }
-
-            // Otherwise, handle open/closed
-            if (data.status === "open") {
-                updateStatusUI(); 
-            } else if (data.status === "closed") {
-                showStatus("This question is closed.", "info");
             }
 
             currentOptions.forEach(optionText => {
                 const btn = document.createElement('button');
                 btn.className = 'option-btn';
                 btn.innerText = optionText;
+                btn.value = optionText;
                 
-                if (data.status === "closed") {
-                    btn.disabled = true;
-                } else {
-                    btn.onclick = () => submitAnswer(optionText, btn);
-                }
-
-                if (currentSelection === optionText) btn.classList.add('selected');
+                btn.onclick = () => submitAnswer(optionText);
                 optionsContainer.appendChild(btn);
             });
 
-            updateClickerBackground();
+            updateAnswerUI();
+            updateStatusUI();
 
             if (isNewQuestionLoad) {
                 restorePreviousAnswer(activeQuestionId);
             }
         }
 
+        function updateAnswerUI() {
+            optionsContainer.querySelectorAll('.option-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.value === currentSelection);
+                btn.disabled = currentStatus !== "open";
+                // Ignore pending taps without flashing the grey disabled-button styling.
+                btn.setAttribute('aria-disabled', String(btn.disabled || pendingVote !== null));
+            });
+            updateClickerBackground(currentStatus === "complete");
+        }
+
         // 4. Send the vote (or delete it)
-        async function submitAnswer(selectedOption, clickedButton) {
-            if (!currentUser || !activeQuestionId) return;
+        async function submitAnswer(selectedOption) {
+            if (!currentUser || !activeQuestionId || currentStatus !== "open" || pendingVote) return;
 
             // Block ANY click (selecting or unselecting) if they are out of clicks
             if (clicksRemaining <= 0) {
@@ -232,36 +239,73 @@
                 return;
             }
 
-            const answerRef = doc(db, "questions", activeQuestionId, "answers", currentUser.uid);
+            const vote = {
+                questionId: activeQuestionId,
+                previousSelection: currentSelection,
+                selection: currentSelection === selectedOption ? null : selectedOption,
+                showPendingStatus: false
+            };
+            pendingVote = vote;
+            answerRevision++;
+            currentSelection = vote.selection;
+            updateAnswerUI();
+            updateStatusUI();
 
+            vote.statusTimer = setTimeout(() => {
+                if (pendingVote === vote) {
+                    vote.showPendingStatus = true;
+                    updateStatusUI();
+                }
+            }, 1000);
+
+            const answerRef = doc(db, "questions", vote.questionId, "answers", currentUser.uid);
+            let writeError = null;
             try {
-                if (currentSelection === selectedOption) {
-                    // Unchecking an answer
-                    currentSelection = null;
-                    clickedButton.classList.remove('selected');
+                if (vote.selection === null) {
                     await deleteDoc(answerRef);
                 } else {
-                    // Selecting/Changing an answer
-                    currentSelection = selectedOption;
-                    document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
-                    clickedButton.classList.add('selected');
-                    await setDoc(answerRef, { choice: selectedOption, timestamp: serverTimestamp() });
+                    await setDoc(answerRef, { choice: vote.selection, timestamp: serverTimestamp() });
                 }
+            } catch (error) {
+                writeError = error;
+                console.error("Error saving answer:", error);
+            } finally {
+                clearTimeout(vote.statusTimer);
+            }
 
-                // Any successful action (checking or unchecking) now costs a click
+            // Another question may have launched while Firestore was confirming this write.
+            if (pendingVote !== vote) return;
+            pendingVote = null;
+
+            if (writeError) {
+                currentSelection = vote.previousSelection;
+            } else {
+                // Only confirmed actions consume a click.
                 clicksRemaining--;
                 localStorage.setItem('active_poll_clicks', clicksRemaining);
+            }
 
-                updateClickerBackground();
+            updateAnswerUI();
+            if (writeError && currentStatus === "open") {
+                showStatus("Your change could not be saved. Please try again.", "error");
+            } else {
                 updateStatusUI();
-
-            } catch (error) {
-                console.error("Error:", error);
-                showStatus("Connection error. Please tap again.", "error");
             }
         }
 
         function updateStatusUI() {
+            if (currentStatus === "complete") {
+                showStatus("Waiting for the next question to launch...", "info");
+                return;
+            }
+            if (currentStatus === "closed") {
+                showStatus("This question is closed.", "info");
+                return;
+            }
+            if (pendingVote && pendingVote.showPendingStatus) {
+                showStatus(navigator.onLine ? "Sending…" : "Waiting for connection…", "info");
+                return;
+            }
             if (clicksRemaining === maxClicksPerQuestion) {
                 showStatus("Select your answer.", "info");
                 return;
@@ -278,27 +322,26 @@
             showStatus("");
         }
 
+        // Connectivity changes only update the message; Firestore handles queued writes.
+        ['online', 'offline'].forEach(eventName => {
+            window.addEventListener(eventName, () => {
+                if (pendingVote && pendingVote.showPendingStatus) updateStatusUI();
+            });
+        });
+
         // 5. Check if the user already answered this question
         async function restorePreviousAnswer(questionId) {
             if (!currentUser || !questionId) return;
+            const revision = answerRevision;
 
             try {
                 const answerRef = doc(db, "questions", questionId, "answers", currentUser.uid);
                 const docSnap = await getDoc(answerRef);
 
-                // If they have an answer on record, and the question hasn't changed while loading:
-                if (docSnap.exists() && activeQuestionId === questionId) {
-                    currentSelection = docSnap.data().choice;
-
-                    // Find the matching button and add the 'selected' class
-                    document.querySelectorAll('.option-btn').forEach(btn => {
-                        if (btn.innerText === currentSelection) {
-                            btn.classList.add('selected');
-                        }
-                    });
-                }
-
-                updateClickerBackground();
+                // A slow initial read must not overwrite a newer tap or another question.
+                if (activeQuestionId !== questionId || answerRevision !== revision) return;
+                currentSelection = docSnap.exists() ? docSnap.data().choice : null;
+                updateAnswerUI();
             } catch (error) {
                 console.error("Error fetching previous answer:", error);
             }
