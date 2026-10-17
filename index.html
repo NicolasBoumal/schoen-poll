@@ -54,7 +54,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp, disableNetwork, enableNetwork } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         import { firebaseConfig, colors } from "./config.js";
 
@@ -73,6 +73,8 @@
         let currentStatus = null;
         let pendingVote = null;
         let answerState = null;
+        let unsubscribeLiveState = null;
+        let reconnectPromise = null;
 
         const maxClicksPerQuestion = 6; // Feeling facetious?
         let clicksRemaining = maxClicksPerQuestion;
@@ -154,12 +156,18 @@
         // 2. Listen to the live state
         function startListeningToLiveState() {
             const liveStateRef = doc(db, "state", "live");
+            if (unsubscribeLiveState) unsubscribeLiveState();
             
-            onSnapshot(liveStateRef, (docSnap) => {
+            unsubscribeLiveState = onSnapshot(liveStateRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     handleStateChange(data);
                 }
+            }, (error) => {
+                // Firestore stops delivering updates after a terminal listener error.
+                unsubscribeLiveState = null;
+                console.error("Live updates failed:", error);
+                showStatus("Live updates stopped. Switch away and back to retry.", "error");
             });
         }
 
@@ -370,20 +378,35 @@
             }
         }
 
-        // 6. Wake up instantly when the phone screen turns back on
-        document.addEventListener("visibilitychange", async () => {
-            if (document.visibilityState === 'visible' && currentUser) {
-                // The tab is active again. The Firestore websocket might be asleep. 
-                // Force a manual HTTP fetch right now to get the UI in sync instantly.
+        // 6. Recover the live connection after the browser suspends this page.
+        function reconnectLiveState() {
+            if (!currentUser || document.visibilityState !== 'visible' || !navigator.onLine) return;
+            if (reconnectPromise) return reconnectPromise;
+
+            // Reset a potentially stalled connection, keeping queued votes intact.
+            // Coalesce visibility, pageshow, and online events into one recovery.
+            reconnectPromise = (async () => {
                 try {
-                    const docSnap = await getDoc(doc(db, "state", "live"));
-                    if (docSnap.exists()) {
-                        handleStateChange(docSnap.data());
-                    }
-                } catch (error) {
-                    console.error("Error waking up connection:", error);
+                    await disableNetwork(db);
+                    if (!unsubscribeLiveState) startListeningToLiveState();
+                } finally {
+                    await enableNetwork(db);
                 }
-            }
+            })().catch((error) => {
+                console.error("Error reconnecting live updates:", error);
+                showStatus("Could not reconnect. Switch away and back to retry.", "error");
+            }).finally(() => {
+                reconnectPromise = null;
+            });
+            return reconnectPromise;
+        }
+
+        // Use the live listener as the sole source of poll state: a separate wake-up
+        // fetch could return stale data after a newer listener snapshot has arrived.
+        document.addEventListener("visibilitychange", reconnectLiveState);
+        window.addEventListener("online", reconnectLiveState);
+        window.addEventListener("pageshow", (event) => {
+            if (event.persisted) reconnectLiveState();
         });
     </script>
 </body>
